@@ -1,0 +1,42 @@
+# ==========================================================
+# Eclipse / STM32 SDK (SW4STM32 / AC6) build artifacts
+# ==========================================================
+Debug/
+Release/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.launch
+*.su
+*.ld
+
+# ==========================================================
+# Eclipse workspace / IDE metadata
+# (keep .project and .cproject — they define the build config;
+#  ignore workspace-local settings that differ per machine)
+# ==========================================================
+.settings/
+.metadata/
+.autotools/
+.pydevproject
+.cproject
+.project
+
+# ==========================================================
+# OS / editor cruft
+# ==========================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ==========================================================
+# Misc
+# ==========================================================
+*.log
+*.bak
