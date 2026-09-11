@@ -19,9 +19,9 @@ The device is built around the STM32F401 microcontroller. It captures heart-rate
 
 | Member | Responsibilities |
 |---|---|
-| **Omar** | Heart Rate Monitoring module (sensor driver + alert/logging logic), Interactive UI (TFT/7-segment dashboard, settings, history), and the **web monitoring dashboard** (frontend + backend API) |
+| **Omar Desoky** | Heart Rate Monitoring module, USART communication (pi and stm) , web monitoring dashboard (frontend + backend API) |
 | **Khaled Gado** | Step Counter & Activity Tracking module (accelerometer driver + step/activity-recognition logic), LED Matrix visualization |
-| **Hussien Ahmed** | Wireless Data Transmission (Wi-Fi + secure sync), Audio Feedback & Alerts, Power Management & Manual Controls |
+| **Hussien Ahmed** | TFT Integration and 7-Segment dashboard ,  Audio Feedback & Alerts, Power Management & Manual Controls |
 
 ## Documentation
 
