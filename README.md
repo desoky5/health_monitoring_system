@@ -13,6 +13,7 @@ The device is built around the STM32F401 microcontroller. It captures heart-rate
 - **Web monitoring dashboard** (FR-8) — live view of heart rate, step count, and movement/activity status, with a heart-rate trend chart, configurable daily step goal, and light/dark theme
 - **Backend API** — receives and serves heart-rate, step, and acceleration readings (PHP endpoint with JSON storage; a Node.js/SSE-based backend is also included as an alternative)
 - **Firmware** — driver and feature-logic development in progress per the module breakdown below
+- **Heart Rate Sensor** — ADC driver for Heart Rate sensor Interfacing and BPM was tested by being sent over USART and TTL to PUTTY App on laptop
 
 ## Team & Task Breakdown
 
