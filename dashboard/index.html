@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Health Monitor</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			--background: #101722;
+			--panel: #182331;
+			--panel-light: #213044;
+			--text: #f4f7fb;
+			--muted: #9eacbd;
+			--accent: #ff5b6e;
+			--accent-soft: rgba(255, 91, 110, 0.14);
+			--border: rgba(255, 255, 255, 0.1);
+			--input-background: rgba(0, 0, 0, 0.18);
+			--shadow: rgba(0, 0, 0, 0.28);
+		}
+
+		:root[data-theme="light"] {
+			color-scheme: light;
+			--background: #eef2f5;
+			--panel: #ffffff;
+			--panel-light: #f8fafb;
+			--text: #17212b;
+			--muted: #64717d;
+			--accent: #d74458;
+			--accent-soft: rgba(215, 68, 88, 0.12);
+			--border: rgba(23, 33, 43, 0.14);
+			--input-background: rgba(23, 33, 43, 0.05);
+			--shadow: rgba(23, 33, 43, 0.12);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			min-height: 100vh;
+			margin: 0;
+			display: grid;
+			place-items: center;
+			padding: 24px;
+			background: radial-gradient(circle at top right, var(--panel-light) 0, var(--background) 44%);
+			color: var(--text);
+			font-family: Georgia, "Times New Roman", serif;
+		}
+
+		main {
+			width: min(100%, 820px);
+		}
+
+		.header {
+			display: flex;
+			align-items: start;
+			justify-content: space-between;
+			gap: 20px;
+			margin-bottom: 18px;
+		}
+
+		.theme-toggle {
+			width: 42px;
+			height: 42px;
+			flex: 0 0 auto;
+			padding: 0;
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			background: var(--panel);
+			color: var(--text);
+			cursor: pointer;
+			font: 1.25rem/1 "Trebuchet MS", sans-serif;
+		}
+
+		.theme-toggle span::before {
+			content: "\2600";
+		}
+
+		:root[data-theme="light"] .theme-toggle span::before {
+			content: "\263E";
+		}
+
+		.theme-toggle:hover {
+			border-color: var(--accent);
+		}
+
+		.eyebrow {
+			margin: 0 0 8px;
+			color: var(--accent);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.75rem;
+			font-weight: 700;
+			letter-spacing: 0.14em;
+			text-transform: uppercase;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: clamp(2rem, 7vw, 3.2rem);
+			font-weight: 400;
+		}
+
+		.subtitle {
+			margin: 8px 0 0;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.95rem;
+		}
+
+		.monitor {
+			min-width: 0;
+			padding: clamp(28px, 6vw, 48px);
+			border: 1px solid var(--border);
+			border-radius: 12px;
+			background: linear-gradient(145deg, var(--panel-light), var(--panel));
+			box-shadow: 0 24px 60px var(--shadow);
+		}
+
+		.dashboard {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 16px;
+		}
+
+		.reading-label {
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.85rem;
+			text-transform: uppercase;
+			letter-spacing: 0.1em;
+		}
+
+		.reading {
+			display: flex;
+			align-items: baseline;
+			min-width: 0;
+			flex-wrap: wrap;
+			gap: 12px;
+			margin: 14px 0 24px;
+		}
+
+		#heart-rate,
+		#step-count {
+			min-width: 0;
+			max-width: 100%;
+			color: var(--text);
+			font-size: clamp(3.25rem, 10vw, 5.5rem);
+			line-height: 0.9;
+			font-variant-numeric: tabular-nums;
+			overflow-wrap: anywhere;
+		}
+
+		#step-count {
+			font-size: clamp(2.75rem, 8vw, 4.5rem);
+		}
+
+		.unit {
+			color: var(--accent);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 1rem;
+			font-weight: 700;
+		}
+
+		.status {
+			display: flex;
+			align-items: center;
+			gap: 9px;
+			padding-top: 18px;
+			border-top: 1px solid var(--border);
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.9rem;
+		}
+
+		.status-dot {
+			width: 9px;
+			height: 9px;
+			border-radius: 50%;
+			background: var(--accent);
+			box-shadow: 0 0 0 6px var(--accent-soft);
+		}
+
+		.chart-title {
+			display: flex;
+			justify-content: space-between;
+			margin: 0 0 12px;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.75rem;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+		}
+
+		.chart {
+			display: block;
+			width: 100%;
+			height: 86px;
+			overflow: visible;
+		}
+
+		.chart-grid {
+			stroke: var(--border);
+			stroke-width: 1;
+		}
+
+		.chart-line {
+			fill: none;
+			stroke: var(--accent);
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			stroke-width: 3;
+		}
+
+		.progress-track {
+			height: 12px;
+			margin-top: 26px;
+			overflow: hidden;
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.1);
+		}
+
+		.progress-value {
+			width: 0%;
+			height: 100%;
+			border-radius: inherit;
+			background: linear-gradient(90deg, #f4b860, #ffd98c);
+			transition: width 300ms ease;
+		}
+
+		.movement-card {
+			grid-column: 1 / -1;
+		}
+
+		.movement-state {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+			margin-top: 24px;
+		}
+
+		.movement-icon {
+			position: relative;
+			width: 56px;
+			height: 56px;
+			flex: 0 0 56px;
+			border-radius: 50%;
+			background: rgba(244, 184, 96, 0.16);
+			color: #f4b860;
+		}
+
+		.movement-icon.moving {
+			background: rgba(53, 184, 98, 0.14);
+			color: #35b862;
+		}
+
+		.movement-icon.no-vitals {
+			background: rgba(224, 70, 70, 0.16);
+			color: #e04646;
+		}
+
+		.activity-figure {
+			position: absolute;
+			inset: 4px;
+			width: calc(100% - 8px);
+			height: calc(100% - 8px);
+			overflow: visible;
+		}
+
+		.figure-chair,
+		.figure-person {
+			fill: none;
+			stroke: currentColor;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			stroke-width: 4;
+		}
+
+		.figure-person {
+			fill: currentColor;
+			stroke-width: 3.5;
+		}
+
+		.figure-walker,
+		.figure-sleeper {
+			display: none;
+		}
+
+		.movement-icon.moving .figure-chair,
+		.movement-icon.no-vitals .figure-chair {
+			display: none;
+		}
+
+		.movement-icon.moving .figure-seated,
+		.movement-icon.no-vitals .figure-seated {
+			display: none;
+		}
+
+		.movement-icon.moving .figure-walker,
+		.movement-icon.no-vitals .figure-sleeper {
+			display: block;
+		}
+
+		.movement-icon.moving .figure-walker {
+			animation: walking-person 700ms ease-in-out infinite alternate;
+		}
+
+		@keyframes walking-person {
+			to { transform: translateY(-2px) rotate(-4deg); }
+		}
+
+		@keyframes walk-left {
+			to { transform: rotate(-28deg); }
+		}
+
+		@keyframes walk-right {
+			to { transform: rotate(28deg); }
+		}
+
+		.movement-value {
+			margin: 0;
+			color: var(--text);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: clamp(1.5rem, 5vw, 2.4rem);
+			font-weight: 700;
+		}
+
+		.movement-description {
+			margin: 4px 0 0;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.85rem;
+		}
+
+		.vitals-alert {
+			margin: 8px 0 0;
+			color: #e04646;
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.8rem;
+			font-weight: 700;
+		}
+
+		.goal {
+			display: flex;
+			justify-content: space-between;
+			margin-top: 10px;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.75rem;
+		}
+
+		.goal-settings {
+			display: flex;
+			align-items: end;
+			gap: 8px;
+			margin-top: 18px;
+		}
+
+		.goal-settings label {
+			display: grid;
+			gap: 6px;
+			flex: 1;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.75rem;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+		}
+
+		.goal-settings input {
+			width: 100%;
+			padding: 9px 10px;
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			background: var(--input-background);
+			color: var(--text);
+			font: inherit;
+			font-size: 0.95rem;
+		}
+
+		.goal-settings button {
+			padding: 10px 14px;
+			border: 0;
+			border-radius: 6px;
+			background: var(--accent);
+			color: #fff;
+			cursor: pointer;
+			font: 700 0.8rem "Trebuchet MS", sans-serif;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+		}
+
+		.goal-settings button:hover {
+			filter: brightness(1.08);
+		}
+
+		.footer {
+			margin-top: 14px;
+			color: var(--muted);
+			font-family: "Trebuchet MS", sans-serif;
+			font-size: 0.75rem;
+			text-align: right;
+		}
+
+		@media (max-width: 560px) {
+			.header {
+				align-items: stretch;
+				flex-direction: column;
+			}
+
+			.theme-toggle {
+				align-self: flex-start;
+			}
+
+			.dashboard {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<header class="header">
+			<div>
+				<p class="eyebrow">Embedded health monitor</p>
+				<h1>Health monitor</h1>
+				<p class="subtitle">Live movement and heart rate data</p>
+			</div>
+			<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="false" title="Switch to light mode"><span aria-hidden="true"></span></button>
+		</header>
+
+		<div class="dashboard">
+			<section class="monitor" aria-labelledby="heart-rate-label">
+				<div id="heart-rate-label" class="reading-label">Heart rate</div>
+				<div class="reading" aria-live="polite">
+					<strong id="heart-rate">--</strong>
+					<span class="unit">BPM</span>
+				</div>
+				<div class="chart-title"><span>Recent trend</span><span>Live</span></div>
+				<svg class="chart" viewBox="0 0 300 100" role="img" aria-label="Heart rate trend">
+					<line class="chart-grid" x1="0" y1="15" x2="300" y2="15"></line>
+					<line class="chart-grid" x1="0" y1="50" x2="300" y2="50"></line>
+					<line class="chart-grid" x1="0" y1="85" x2="300" y2="85"></line>
+					<polyline id="heart-rate-chart" class="chart-line" points=""></polyline>
+				</svg>
+				<div class="status">
+					<span class="status-dot" aria-hidden="true"></span>
+					<span id="sensor-status">Waiting for sensor data</span>
+				</div>
+			</section>
+
+			<section class="monitor" aria-labelledby="step-count-label">
+				<div id="step-count-label" class="reading-label">Steps taken</div>
+				<div class="reading" aria-live="polite">
+					<strong id="step-count">--</strong>
+					<span class="unit">STEPS</span>
+				</div>
+				<div class="chart-title"><span>Daily goal</span><span id="step-goal-heading">10,000</span></div>
+				<div class="progress-track" role="progressbar" aria-label="Daily step goal" aria-valuemin="0" aria-valuemax="10000" aria-valuenow="0">
+					<div id="step-progress" class="progress-value"></div>
+				</div>
+				<div class="goal"><span id="step-progress-label">0 steps</span><span id="step-goal-label">10,000 steps</span></div>
+				<form id="goal-form" class="goal-settings">
+					<label for="step-goal-input">Daily target
+						<input id="step-goal-input" type="number" min="1" max="100000" step="1" inputmode="numeric" required>
+					</label>
+					<button type="submit">Save target</button>
+				</form>
+				<div class="status">
+					<span class="status-dot" aria-hidden="true"></span>
+					<span>Movement tracking</span>
+				</div>
+			</section>
+
+			<section class="monitor movement-card" aria-labelledby="movement-label">
+				<div id="movement-label" class="reading-label">Current activity</div>
+				<div class="movement-state" aria-live="polite">
+					<div id="movement-icon" class="movement-icon" aria-hidden="true">
+						<svg class="activity-figure" viewBox="0 0 64 64" role="img" aria-label="Person sitting on a chair">
+							<g class="figure-chair">
+								<path d="M15 31v17M15 38h31M46 31v17M15 31h31" />
+								<path d="M19 48l-3 10M42 48l3 10M15 31V18" />
+							</g>
+							<g class="figure-person figure-seated">
+								<circle cx="31" cy="13" r="5" />
+								<path d="M31 19v17M31 24l-9 8M31 24l9 7M31 36l13 1M44 37l8 17M44 37H29" />
+							</g>
+							<g class="figure-person figure-walker">
+								<circle cx="32" cy="11" r="5" />
+								<path d="M32 17v18M32 22l-10 10M32 22l10 8M32 35l-9 18M32 35l11 18" />
+							</g>
+							<g class="figure-person figure-sleeper">
+								<circle cx="17" cy="40" r="5" />
+								<path d="M23 40h24M29 40l-8 10M36 40l8 10M27 40l-5-7M39 40l7-6" />
+							</g>
+						</svg>
+					</div>
+					<div>
+						<p id="movement-value" class="movement-value">Waiting for accelerometer</p>
+						<p id="movement-description" class="movement-description">Movement status will appear here</p>
+						<p id="vitals-alert" class="vitals-alert" role="alert" hidden>Critical alert: No heart rate or movement detected</p>
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<div class="footer">Last update: <span id="last-update">--</span></div>
+	</main>
+
+	<script>
+		var savedTheme = localStorage.getItem("healthMonitorTheme");
+		var currentTheme = savedTheme === "light" ? "light" : "dark";
+		var heartRateHistory = [];
+		var dailyStepGoal = Number(localStorage.getItem("dailyStepGoal")) || 10000;
+		var movementThreshold = 0.8;
+		var lastMeasurementTimestamp = null;
+		var latestStepCount = 0;
+		var latestHeartRate = null;
+		var latestAcceleration = null;
+		var sensorConnected = false;
+
+		document.documentElement.dataset.theme = currentTheme;
+
+		function renderThemeToggle() {
+			var themeToggle = document.getElementById("theme-toggle");
+			var isLight = currentTheme === "light";
+			themeToggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+			themeToggle.setAttribute("title", isLight ? "Switch to dark mode" : "Switch to light mode");
+			themeToggle.setAttribute("aria-pressed", isLight);
+		}
+
+		document.getElementById("theme-toggle").addEventListener("click", function () {
+			currentTheme = currentTheme === "light" ? "dark" : "light";
+			document.documentElement.dataset.theme = currentTheme;
+			localStorage.setItem("healthMonitorTheme", currentTheme);
+			renderThemeToggle();
+		});
+
+		renderThemeToggle();
+
+		function formatSteps(value) {
+			return Math.round(value).toLocaleString() + " steps";
+		}
+
+		function renderStepGoal() {
+			document.getElementById("step-goal-input").value = dailyStepGoal;
+			document.getElementById("step-goal-heading").textContent = dailyStepGoal.toLocaleString();
+			document.getElementById("step-goal-label").textContent = formatSteps(dailyStepGoal);
+			document.querySelector("[role='progressbar']").setAttribute("aria-valuemax", dailyStepGoal);
+			document.getElementById("step-progress").style.width = Math.min(latestStepCount / dailyStepGoal * 100, 100) + "%";
+		}
+
+		function drawHeartRateChart(value) {
+			heartRateHistory.push(value);
+			if (heartRateHistory.length > 12) {
+				heartRateHistory.shift();
+			}
+
+			var lowest = Math.min.apply(null, heartRateHistory);
+			var highest = Math.max.apply(null, heartRateHistory);
+			var range = Math.max(highest - lowest, 10);
+			var points = heartRateHistory.map(function (reading, index) {
+				var x = heartRateHistory.length === 1 ? 150 : index * 300 / (heartRateHistory.length - 1);
+				var y = 85 - ((reading - lowest) / range) * 70;
+				return x + "," + y;
+			}).join(" ");
+
+			document.getElementById("heart-rate-chart").setAttribute("points", points);
+		}
+
+		// Call this function when the backend receives a sensor value.
+		function setHeartRate(value) {
+			var heartRate = Number(value);
+			if (!Number.isFinite(heartRate) || heartRate < 0) {
+				return;
+			}
+
+			latestHeartRate = heartRate;
+			document.getElementById("heart-rate").textContent = Math.round(heartRate);
+			drawHeartRateChart(heartRate);
+			document.getElementById("sensor-status").textContent = "Sensor connected";
+			renderMovementState();
+		}
+
+		// Call this function when the backend receives the user's step count.
+		function setStepCount(value) {
+			var stepCount = Number(value);
+			if (!Number.isFinite(stepCount) || stepCount < 0) {
+				return;
+			}
+
+			latestStepCount = stepCount;
+			document.getElementById("step-count").textContent = Math.round(stepCount).toLocaleString();
+			document.querySelector("[role='progressbar']").setAttribute("aria-valuenow", Math.round(stepCount));
+			document.getElementById("step-progress-label").textContent = formatSteps(stepCount);
+			renderStepGoal();
+			document.getElementById("sensor-status").textContent = "Sensor connected";
+		}
+
+		document.getElementById("goal-form").addEventListener("submit", function (event) {
+			event.preventDefault();
+			var requestedGoal = Number(document.getElementById("step-goal-input").value);
+			if (!Number.isInteger(requestedGoal) || requestedGoal < 1 || requestedGoal > 100000) {
+				return;
+			}
+
+			dailyStepGoal = requestedGoal;
+			localStorage.setItem("dailyStepGoal", dailyStepGoal);
+			renderStepGoal();
+		});
+
+		renderStepGoal();
+
+		function setMovementStatus(value) {
+			var acceleration = Number(value);
+			if (!Number.isFinite(acceleration) || acceleration < 0) {
+				return;
+			}
+
+			latestAcceleration = acceleration;
+			renderMovementState();
+			document.getElementById("movement-description").textContent = "Acceleration: " + acceleration.toFixed(2) + " m/s^2";
+		}
+
+		function renderMovementState() {
+			var movementIcon = document.getElementById("movement-icon");
+			var movementValue = document.getElementById("movement-value");
+			var vitalsAlert = document.getElementById("vitals-alert");
+			var noVitals = sensorConnected && latestHeartRate === 0 && latestAcceleration === 0;
+			var isMoving = latestAcceleration !== null && latestAcceleration >= movementThreshold;
+
+			movementIcon.classList.toggle("moving", isMoving && !noVitals);
+			movementIcon.classList.toggle("no-vitals", noVitals);
+			vitalsAlert.hidden = !noVitals;
+			if (noVitals) {
+				movementValue.textContent = "Critical: No readings";
+			} else {
+				movementValue.textContent = isMoving ? "Moving" : "At rest";
+			}
+		}
+
+		function connectToBackend() {
+			function loadMeasurements() {
+				fetch("api.php", { cache: "no-store" })
+					.then(function (response) {
+						if (!response.ok) {
+							throw new Error("Backend request failed");
+						}
+						return response.json();
+					})
+					.then(function (measurement) {
+						sensorConnected = true;
+						document.getElementById("sensor-status").textContent = "Backend connected";
+						if (measurement.updatedAt === lastMeasurementTimestamp) {
+							return;
+						}
+
+						lastMeasurementTimestamp = measurement.updatedAt;
+						if (measurement.heartRate !== null) {
+							setHeartRate(measurement.heartRate);
+						}
+						if (measurement.steps !== null) {
+							setStepCount(measurement.steps);
+						}
+						if (measurement.acceleration !== null) {
+							setMovementStatus(measurement.acceleration);
+						}
+						if (measurement.updatedAt) {
+							document.getElementById("last-update").textContent = new Date(measurement.updatedAt).toLocaleTimeString();
+						}
+					})
+					.catch(function () {
+						sensorConnected = false;
+						renderMovementState();
+						document.getElementById("sensor-status").textContent = "Waiting for backend connection";
+					});
+			}
+
+			loadMeasurements();
+			setInterval(loadMeasurements, 2000);
+		}
+
+		connectToBackend();
+	</script>
+</body>
+</html>
+ 
