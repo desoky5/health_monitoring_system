@@ -10,6 +10,7 @@
 
 #include "../../MCAL/RCC/RCC_int.h"
 #include "../../MCAL/GPIO/GPIO_int.h"
+#include "../../MCAL/SYSTICK/SYSTICK_int.h"
 #include "S2P_int.h"
 
 
