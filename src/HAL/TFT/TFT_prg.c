@@ -75,11 +75,6 @@ static void write_data(u8  A_u8data)
 	MGPIO_vInit(&TFT_RST_PIN);
 
 	MSPI_vInit();
-	MSYSTIC_Config_t STK_cfg =
-	{
-			.InterruptEnable = INT_DISABLE,
-			.CLK_SRC = CLK_SRC_AHB_8
-	};
 	//RESET
 	Reset_seq();
 
@@ -112,7 +107,7 @@ void HTFT_vShowImage(const u16 A_u16ImgArray[],u16 A_u16ImgSize)
 	for (u16 i = 0 ; i <A_u16ImgSize; i++)
 	{
 	 MSB = (A_u16ImgArray[i]&0xFF00)>>8;
-	 LSB = A_u16ImgArray[i]&0xFF00;
+	 LSB = A_u16ImgArray[i]&0x00FF;
 	 write_data(MSB);
 	 write_data(LSB);
 	}
@@ -137,7 +132,7 @@ void HTFT_vSetYPos(u16 A_u16yStart, u16 A_u16yEnd)
 }
 void HTFT_vFillBackgroundColor(u16 A_u16Color)
 {
-	u8 MSB = (u8)((A_u16Color & 0xFF00) >> 8);
+	u16 MSB = (u8)((A_u16Color & 0xFF00) >> 8);
 	u8 LSB = (u8)(A_u16Color & 0x00FF);
 
 	HTFT_vSetXPos(0, 127);
