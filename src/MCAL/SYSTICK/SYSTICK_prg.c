@@ -145,7 +145,7 @@ void MSYSTICK_vSetIntervalMulti_us(u32 A_u32Delay_us, void (*Fptr)(void))
 }
 
 
-void SysTick_Handler (void)
+void MSYSTICK_vLegacyHandler (void)
 {
 if(G_xFptr !=NULL)
 {
