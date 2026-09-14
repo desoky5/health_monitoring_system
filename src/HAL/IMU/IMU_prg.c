@@ -55,20 +55,20 @@
 
 static void IMU_vSelect(void)
 {
-	MGPIO_vSetPinValue(IMU_CS_Port, IMU_CS_Pin, GPIO_LOW);
+	MGPIO_vSetPinVal(IMU_CS_Port, IMU_CS_Pin, GPIO_LOW);
 }
 
 static void IMU_vDeselect(void)
 {
-	MGPIO_vSetPinValue(IMU_CS_Port, IMU_CS_Pin, GPIO_HIGH);
+	MGPIO_vSetPinVal(IMU_CS_Port, IMU_CS_Pin, GPIO_HIGH);
 }
 
 /* Single-byte write */
 static void IMU_vWriteReg(u8 A_u8Reg, u8 A_u8Data)
 {
 	IMU_vSelect();
-	(void)MSPI_vTransev(ADXL345_SPI_WRITE | (A_u8Reg & ADXL345_ADDR_MASK));
-	(void)MSPI_vTransev(A_u8Data);
+	(void)MSPI_u8Transcieve(ADXL345_SPI_WRITE | (A_u8Reg & ADXL345_ADDR_MASK));
+	(void)MSPI_u8Transcieve(A_u8Data);
 	IMU_vDeselect();
 }
 
@@ -78,8 +78,8 @@ static u8 IMU_u8ReadReg(u8 A_u8Reg)
 	u8 L_u8Data;
 
 	IMU_vSelect();
-	(void)MSPI_vTransev(ADXL345_SPI_READ | (A_u8Reg & ADXL345_ADDR_MASK));
-	L_u8Data = MSPI_vTransev(0x00U);
+	(void)MSPI_u8Transcieve(ADXL345_SPI_READ | (A_u8Reg & ADXL345_ADDR_MASK));
+	L_u8Data = MSPI_u8Transcieve(0x00U);
 	IMU_vDeselect();
 
 	return L_u8Data;
@@ -92,11 +92,11 @@ static void IMU_vReadAcceleration(s16 *A_ps16X, s16 *A_ps16Y, s16 *A_ps16Z)
 
 	IMU_vSelect();
 	/* Must include ADXL345_SPI_MB so sensor auto-increments register address */
-	(void)MSPI_vTransev(ADXL345_SPI_READ | ADXL345_SPI_MB | (ADXL345_DATAX0 & ADXL345_ADDR_MASK));
+	(void)MSPI_u8Transcieve(ADXL345_SPI_READ | ADXL345_SPI_MB | (ADXL345_DATAX0 & ADXL345_ADDR_MASK));
 
 	for (u8 i = 0U; i < 6U; i++)
 	{
-		L_u8Data[i] = MSPI_vTransev(0x00U);
+		L_u8Data[i] = MSPI_u8Transcieve(0x00U);
 	}
 	IMU_vDeselect();
 
@@ -148,27 +148,28 @@ void HIMU_vInit(void)
 	static GPIOx_PinConfig_t G_xCS = {
 		.Port = IMU_CS_Port,
 		.Pin = IMU_CS_Pin,
-		.Mode = GPIO_MODE_OUTPUT,
-		.OutputType = GPIO_OT_PUSHPULL,
-		.PullType = GPIO_NO_PULL,
-		.Speed = GPIO_SPEED_HIGH};
+		.Mode = GPIO_Output,
+		.OutputType = OUTPUT_push_pull,
+		.PullType = GPIO_OT_NOPULL,
+		.OutputSpeed = Output_high_speed};
 	static GPIOx_PinConfig_t IMU_INT1 = {
 		.Port = IMU_INT1_Port,
 		.Pin = IMU_INT1_Pin,
-		.Mode = GPIO_MODE_INPUT,
-		.PullType = GPIO_NO_PULL
+		.Mode = GPIO_Input,
+		.PullType = GPIO_OT_NOPULL
 
 	};
 	static GPIOx_PinConfig_t IMU_INT2 = {
 		.Port = IMU_INT2_Port,
 		.Pin = IMU_INT2_Pin,
-		.Mode = GPIO_MODE_INPUT,
-		.PullType = GPIO_NO_PULL
+		.Mode = GPIO_Input,
+		.PullType = GPIO_OT_NOPULL
 
 	};
-	MGPIO_vPinInit(&G_xCS);
-	MGPIO_vPinInit(&IMU_INT1);
-	MGPIO_vPinInit(&IMU_INT2);
+	MGPIO_vInit(&G_xCS);
+	MGPIO_vInit(&IMU_INT1);
+	MGPIO_vInit(&IMU_INT2);
+
 
 
 	IMU_vWriteReg(ADXL345_POWER_CTL, 0x08U); /* Enable measurement mode. */

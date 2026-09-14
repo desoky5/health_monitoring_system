@@ -10,13 +10,13 @@
 
 #define IMU_CS_Port	GPIO_PORTA
 
-#define IMU_CS_Pin	GPIO_PIN0
+#define IMU_CS_Pin	GPIO_PIN2
 
 #define IMU_INT2_Port	GPIO_PORTA
-#define IMU_INT2_Pin	GPIO_PIN1
+#define IMU_INT2_Pin	GPIO_PIN4
 
 #define IMU_INT1_Port	GPIO_PORTA
-#define IMU_INT1_Pin	GPIO_PIN2
+#define IMU_INT1_Pin	GPIO_PIN3
 //SDA -> MOSI
 //SDO -> MISO
 
