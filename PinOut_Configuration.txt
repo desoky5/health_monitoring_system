@@ -1,0 +1,9 @@
+-------------------------------------------------------------
+-------------------Heart Rate Pulse Sensor-------------------
+-- Sensor GND    ---->  STM32 GND
+-- Sensor VCC    ---->  STM32 3.3V
+-- Sensor Signal ---->  STM32 PA0 (ADC Channel 0)
+----------------------------------------
+------- UART PI COMMUNICATION (RaspberryPi3 Model B+) ----- --
+-- PI GPIO15(RXD) ------> STM32 PA9 (TX) 
+-- PI GPIO14(TXD) ------> STM32 PA10 (RX)
