@@ -26,7 +26,7 @@ GPIOx_PinConfig_t TFT_RST_PIN =
 GPIOx_PinConfig_t TFT_A0_PIN =
 {
 		.Port = GPIO_PORTB,
-		.Pin = GPIO_PIN12,
+		.Pin = GPIO_PIN13,
 		.Mode =GPIO_Output,
 		.OutputType = OUTPUT_push_pull,
 		.OutputSpeed = Output_high_speed
@@ -61,12 +61,12 @@ static void Reset_seq(void)
 static void write_cmd(u8  A_u8cmd)
 {
 	MGPIO_vSetPinVal(TFT_A0_PIN.Port,TFT_A0_PIN.Pin,GPIO_LOW);
-	(void)MSPI_u8Transcieve(A_u8cmd);
+	(void)MSPI2_u8Transcieve(A_u8cmd);
 }
 static void write_data(u8  A_u8data)
 {
 	MGPIO_vSetPinVal(TFT_A0_PIN.Port,TFT_A0_PIN.Pin,GPIO_HIGH);
-	(void)MSPI_u8Transcieve(A_u8data);
+	(void)MSPI2_u8Transcieve(A_u8data);
 }
 
 	void HTFT_vInit(void)
@@ -74,7 +74,7 @@ static void write_data(u8  A_u8data)
 	MGPIO_vInit(&TFT_A0_PIN);
 	MGPIO_vInit(&TFT_RST_PIN);
 
-	MSPI_vInit();
+	MSPI2_vInit();
 	//RESET
 	Reset_seq();
 
@@ -340,3 +340,4 @@ void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color)
 
 	HTFT_vWriteText(A_u16X, A_u16Y, Local_acNumber, A_u16Color);
 }
+

@@ -42,3 +42,35 @@ u8 MSPI_u8Transcieve(u8 A_u8Data)
 	return SPI1->DR;
 
 }
+
+void MSPI2_vInit(void)
+{
+//	// Disable Bidirectional Data Mode
+//	CLR_BIT(SPI1->CR1,15);
+//	//Configure Data Frame Format
+//	CLR_BIT(SPI1->CR1,11);
+	//SW SLAVE
+	SET_BIT(SPI2->CR1,SSM);
+	SET_BIT(SPI2->CR1,SSI);
+	//MASTER SELLECT
+	SET_BIT(SPI2->CR1,MSTR);
+	//data frame
+	CLR_BIT(SPI2->CR1,DFF);
+	//clk 1 when idle
+	CLR_BIT(SPI2->CR1,CPHA);
+	//The first clock transition is the first data capture edge
+	CLR_BIT(SPI2->CR1,CPOL);
+	CLR_BIT(SPI2->CR1,LSBFIRST);
+	//SPI Enabled
+	SET_BIT(SPI2->CR1,SPE);
+}
+
+u8 MSPI2_u8Transcieve(u8 A_u8Data)
+{
+	//transmit
+	while(!GET_BIT(SPI2->SR,TXE));
+	SPI2->DR = A_u8Data;
+	while(!GET_BIT(SPI2->SR,RXNE));
+	return SPI2->DR;
+
+}
