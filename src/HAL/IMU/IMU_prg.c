@@ -47,8 +47,6 @@
 #define ADXL345_INACTIVE_MG 30U
 #define ADXL345_SLOW_MG 150U
 #define ADXL345_NORMAL_MG 300U
-#define ADXL345_STEP_DELTA_MG 80U
-#define ADXL345_STEP_DEBOUNCE_SAMPLES 3U
 
 #define ADXL345_SPI_READ (0x80U)
 #define ADXL345_SPI_WRITE (0x00U)
@@ -265,9 +263,9 @@ u8 HIMU_u8StepCounter(void)
 		return 0U;
 	}
 
-	if (L_u32MagnitudeDelta >= ADXL345_STEP_DELTA_MG)
+	if (L_u32MagnitudeDelta >= IMU_STEP_DELTA_THRESHOLD_MG)
 	{
-		L_u8DebounceSamples = ADXL345_STEP_DEBOUNCE_SAMPLES;
+		L_u8DebounceSamples = IMU_STEP_LOCKOUT_SAMPLES;
 		return 1U;
 	}
 
