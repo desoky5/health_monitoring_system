@@ -340,7 +340,3 @@ void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color)
 
 	HTFT_vWriteText(A_u16X, A_u16Y, Local_acNumber, A_u16Color);
 }
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes

@@ -21,6 +21,8 @@
 #define RCC_GPIOC 		2
 #define RCC_USART1		4
 #define RCC_SPI1		12
+#define RCC_SPI2		14
+#define RCC_SYSCFG		14
 
 void MRCC_vInit(void);
 
