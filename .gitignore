@@ -27,6 +27,9 @@ system/
 .pydevproject
 .cproject
 .project
+.vscode/
+dashboard/__pycache__/
+dashboard/requirements.txt
 
 # ==========================================================
 # OS / editor cruft
