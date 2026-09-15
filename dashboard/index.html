@@ -497,7 +497,7 @@
 					</div>
 					<div>
 						<p id="movement-value" class="movement-value">Waiting for accelerometer</p>
-						<p id="movement-description" class="movement-description">Movement status will appear here</p>
+						<p id="movement-description" class="movement-description">Acceleration will appear here</p>
 						<p id="vitals-alert" class="vitals-alert" role="alert" hidden>Critical alert: No heart rate or movement detected</p>
 					</div>
 				</div>
@@ -568,7 +568,6 @@
 			document.getElementById("heart-rate-chart").setAttribute("points", points);
 		}
 
-		// Call this function when the backend receives a sensor value.
 		function setHeartRate(value) {
 			var heartRate = Number(value);
 			if (!Number.isFinite(heartRate) || heartRate < 0) {
@@ -582,7 +581,6 @@
 			renderMovementState();
 		}
 
-		// Call this function when the backend receives the user's step count.
 		function setStepCount(value) {
 			var stepCount = Number(value);
 			if (!Number.isFinite(stepCount) || stepCount < 0) {
@@ -619,7 +617,7 @@
 
 			latestAcceleration = acceleration;
 			renderMovementState();
-			document.getElementById("movement-description").textContent = "Acceleration: " + acceleration.toFixed(2) + " m/s^2";
+				document.getElementById("movement-description").textContent = "Acceleration: " + Math.round(acceleration) + " mg";
 		}
 
 		function renderMovementState() {
