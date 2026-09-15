@@ -29,7 +29,7 @@ void HTFT_vFillRectangle(u16 A_u16Color);
 void HTFT_vWriteText(u16 A_u16X, u16 A_u16Y, const char *A_pcText, u16 A_u16Color);
 void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color);
 
-#define RESET_BIT_PORT GPIO_PORTA
-#define RESET_BIT GPIO_PIN0
+#define RESET_BIT_PORT GPIO_PORTB
+#define RESET_BIT GPIO_PIN12
 
 #endif /* HAL_TFT_TFT_INT_H_ */
