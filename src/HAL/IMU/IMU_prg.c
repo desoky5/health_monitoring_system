@@ -47,6 +47,8 @@
 #define ADXL345_INACTIVE_MG 30U
 #define ADXL345_SLOW_MG 150U
 #define ADXL345_NORMAL_MG 300U
+#define ADXL345_STEP_DELTA_MG 80U
+#define ADXL345_STEP_DEBOUNCE_SAMPLES 3U
 
 #define ADXL345_SPI_READ (0x80U)
 #define ADXL345_SPI_WRITE (0x00U)
@@ -169,6 +171,8 @@ void HIMU_vInit(void)
 	MGPIO_vInit(&G_xCS);
 	MGPIO_vInit(&IMU_INT1);
 	MGPIO_vInit(&IMU_INT2);
+	/* CS is active low; leave the sensor deselected between transactions. */
+	MGPIO_vSetPinVal(IMU_CS_Port, IMU_CS_Pin, GPIO_HIGH);
 
 
 
@@ -234,27 +238,39 @@ u8 HIMU_u8ReadStatus(void)
 
 u8 HIMU_u8StepCounter(void)
 {
-	static u8 L_u8PreviousMovement = 0U;
+	static u32 L_u32PreviousMagnitude = 0U;
+	static u8 L_u8DebounceSamples = 0U;
 	s16 L_s16X;
 	s16 L_s16Y;
 	s16 L_s16Z;
 	u32 L_u32MagnitudeMg;
-	u8 L_u8Movement;
+	u32 L_u32MagnitudeDelta;
 
 	IMU_vReadAcceleration(&L_s16X, &L_s16Y, &L_s16Z);
 	L_u32MagnitudeMg = IMU_u32MagnitudeMg(L_s16X, L_s16Y, L_s16Z);
-	L_u8Movement = (L_u32MagnitudeMg < (1000U - ADXL345_SLOW_MG) ||
-					L_u32MagnitudeMg > (1000U + ADXL345_SLOW_MG))
-					   ? 1U
-					   : 0U;
-
-	if ((L_u8Movement == 1U) && (L_u8PreviousMovement == 0U))
+	if (L_u32PreviousMagnitude == 0U)
 	{
-		L_u8PreviousMovement = 1U;
+		L_u32PreviousMagnitude = L_u32MagnitudeMg;
+		return 0U;
+	}
+
+	L_u32MagnitudeDelta = (L_u32MagnitudeMg > L_u32PreviousMagnitude)
+							  ? (L_u32MagnitudeMg - L_u32PreviousMagnitude)
+							  : (L_u32PreviousMagnitude - L_u32MagnitudeMg);
+	L_u32PreviousMagnitude = L_u32MagnitudeMg;
+
+	if (L_u8DebounceSamples > 0U)
+	{
+		L_u8DebounceSamples--;
+		return 0U;
+	}
+
+	if (L_u32MagnitudeDelta >= ADXL345_STEP_DELTA_MG)
+	{
+		L_u8DebounceSamples = ADXL345_STEP_DEBOUNCE_SAMPLES;
 		return 1U;
 	}
 
-	L_u8PreviousMovement = L_u8Movement;
 	return 0U;
 }
 

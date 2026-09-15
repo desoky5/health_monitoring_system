@@ -13,10 +13,15 @@
 
 void MSPI_vInit(void)
 {
-//	// Disable Bidirectional Data Mode
-//	CLR_BIT(SPI1->CR1,15);
-//	//Configure Data Frame Format
-//	CLR_BIT(SPI1->CR1,11);
+	/* ADXL345 supports SPI clock rates up to 5 MHz.
+	 * With the 25 MHz HSE used by the Blackpill, APB2 is 25 MHz,*/
+	CLR_BIT(SPI1->CR1, SPE);
+
+	CLR_BIT(SPI1->CR1, BR0);
+	CLR_BIT(SPI1->CR1, BR1);
+	SET_BIT(SPI1->CR1, BR2);
+
+
 	//SW SLAVE
 	SET_BIT(SPI1->CR1,SSM);
 	SET_BIT(SPI1->CR1,SSI);
@@ -24,10 +29,10 @@ void MSPI_vInit(void)
 	SET_BIT(SPI1->CR1,MSTR);
 	//data frame
 	CLR_BIT(SPI1->CR1,DFF);
-	//clk 1 when idle
-	CLR_BIT(SPI1->CR1,CPHA);
-	//The first clock transition is the first data capture edge
-	CLR_BIT(SPI1->CR1,CPOL);
+	/* ADXL345 uses SPI mode 3: clock high when idle, sample on the
+	 * second clock edge. */
+	SET_BIT(SPI1->CR1,CPHA);
+	SET_BIT(SPI1->CR1,CPOL);
 	CLR_BIT(SPI1->CR1,LSBFIRST);
 	//SPI Enabled
 	SET_BIT(SPI1->CR1,SPE);

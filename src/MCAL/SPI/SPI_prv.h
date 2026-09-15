@@ -21,6 +21,9 @@
 #define MSTR 2
 #define CPOL 1
 #define CPHA 0
+#define BR0			3
+#define BR1			4
+#define BR2			5
 #define TXE 1
 #define RXNE 0
 typedef struct {

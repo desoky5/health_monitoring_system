@@ -1,123 +1,212 @@
-/*
- * main.c
- *
- *  Created on: Sep 13, 2026
- *      Author: Omar Desoky
- */
 #include "../LIB/STD_TYPES.h"
+
 #include "../MCAL/RCC/RCC_int.h"
 #include "../MCAL/GPIO/GPIO_int.h"
-#include "../MCAL/ADC/ADC_int.h"
+#include "../MCAL/SYSTICK/SYSTICK_int.h"
+#include "../MCAL/SPI/SPI_int.h"
 #include "../MCAL/USART/USART_int.h"
-#include "../HAL/Heart_Rate/HEART_RATE_int.h"
-#include "../FreeRTOS/FreeRTOS.h"
-#include "../FreeRTOS/task.h"
 
-#define HEART_RATE_TASK_PERIOD_MS  10U
-#define USART1_CLOCK_BIT  4U
-#define SCB_CPACR (*(volatile u32*)0xE000ED88U)
+#include "../MCAL/EXTI/EXTI_int.h"
+#include "../MCAL/NVIC/NVIC_int.h"
 
-static void u32ToStr(u32 A_u32Value, char* A_pcBuffer);
+#include "../HAL/IMU/IMU_int.h"
+#include "../HAL/TFT/TFT_int.h"
+// SPI Pins
+// SCK   PA5
+// MISO  PA6
+// MOSI  PA7
+// ADXL345 Pins
+// CS   PA2
+// INT1  PA3
+// INT2  PA4
+// UART Pins
+// tx    A9
+// rx    A10
 
-static void HeartRateTask(void* A_pvParameters)
+static void UART_vSendNumber(u32 A_u32Number)
 {
-    TickType_t L_xLastWakeTime = xTaskGetTickCount();
-    u16 L_u16AdcValue;
-    u16 L_u16Bpm;
-    char L_acStrBuffer[12];
+    char L_str[11];
+    s8 L_s8Index = 0;
 
-    (void)A_pvParameters;
-
-    for (;;)
+    if (A_u32Number == 0U)
     {
-        if (MADC_u8Read(&L_u16AdcValue) == ADC_STATUS_OK)
-        {
-            HHeartRate_vProcessSample(L_u16AdcValue);
-
-            if (HHeartRate_u8GetBpm(&L_u16Bpm))
-            {
-                u32ToStr((u32)L_u16Bpm, L_acStrBuffer);
-                MUSART_vSendString("BPM: ");
-                MUSART_vSendString(L_acStrBuffer);
-                MUSART_vSendString("\r\n");
-            }
-        }
-
-        vTaskDelayUntil(&L_xLastWakeTime,
-                        pdMS_TO_TICKS(HEART_RATE_TASK_PERIOD_MS));
-    }
-}
-
-static void UART_PinsInit(void)
-{
-    GPIOx_PinConfig_t L_xTxCfg = {
-        .Port = GPIO_PORTA,
-        .Pin = GPIO_PIN9,
-        .Mode = GPIO_ALF,
-        .OutputType = OUTPUT_push_pull,
-        .OutputSpeed = Output_high_speed,
-        .PullType = GPIO_OT_NOPULL,
-        .AltFunc = GPIO_AF7
-    };
-    GPIOx_PinConfig_t L_xRxCfg = {
-        .Port = GPIO_PORTA,
-        .Pin = GPIO_PIN10,
-        .Mode = GPIO_ALF,
-        .OutputType = OUTPUT_push_pull,
-        .OutputSpeed = Output_high_speed,
-        .PullType = GPIO_OT_PULLUP,
-        .AltFunc = GPIO_AF7
-    };
-
-    MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOA);
-    MGPIO_vInit(&L_xTxCfg);
-    MGPIO_vInit(&L_xRxCfg);
-}
-
-static void u32ToStr(u32 A_u32Value, char* A_pcBuffer)
-{
-    char L_cTemp[11];
-    u8 L_u8Index = 0U;
-    u8 L_u8Count = 0U;
-
-    if (A_u32Value == 0U)
-    {
-        A_pcBuffer[0] = '0';
-        A_pcBuffer[1] = '\0';
+        MUSART_vSendData('0');
         return;
     }
 
-    while (A_u32Value > 0U)
+    while (A_u32Number > 0U)
     {
-        L_cTemp[L_u8Index++] = (char)('0' + (A_u32Value % 10U));
-        A_u32Value /= 10U;
+        L_str[L_s8Index++] = (char)('0' + (A_u32Number % 10U));
+        A_u32Number /= 10U;
     }
 
-    while (L_u8Index > 0U)
+    while (--L_s8Index >= 0)
     {
-        A_pcBuffer[L_u8Count++] = L_cTemp[--L_u8Index];
+        MUSART_vSendData((u8)L_str[L_s8Index]);
     }
-    A_pcBuffer[L_u8Count] = '\0';
 }
-
 int main(void)
 {
-    SCB_CPACR |= (0xFU << 20U);
 
     MRCC_vInit();
-    UART_PinsInit();
-    MRCC_vEnableCLK(RCC_APB2, USART1_CLOCK_BIT);
+    MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOA);  // Enable GPIOA clock
+    MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOB);  // Enable GPIOB clock
+    MRCC_vEnableCLK(RCC_APB2, RCC_SPI1);   // Enable SPI1 clock
+    MRCC_vEnableCLK(RCC_APB2, RCC_USART1); // Enable USART1 clock
+    MRCC_vEnableCLK(RCC_APB2, RCC_USART1); // Enable USART1 clock
+    MRCC_vEnableCLK(RCC_APB1, 14);
+
+    MSYSTIC_Config_t DELAY = {
+        .InterruptEnable = INT_ENABLE,
+        .CLK_SRC = CLK_SRC_AHB_8};
+    MSYSTICK_vInit(&DELAY);
+    GPIOx_PinConfig_t MOSI1 = {
+            .Port    = GPIO_PORTB,
+            .Pin     = GPIO_PIN15,
+            .Mode    = GPIO_ALF,
+            .AltFunc = GPIO_AF5
+        };
+        MGPIO_vInit(&MOSI1);
+
+        GPIOx_PinConfig_t SCK1 = {
+            .Port    = GPIO_PORTB,
+            .Pin     = GPIO_PIN10,
+            .Mode    = GPIO_ALF,
+            .AltFunc = GPIO_AF5
+        };
+        MGPIO_vInit(&SCK1);
+    GPIOx_PinConfig_t tx = {
+        .Port = GPIO_PORTA,
+        .Pin = GPIO_PIN9,
+        .Mode = GPIO_ALF,
+        .OutputSpeed = Output_low_speed,
+        .OutputType = OUTPUT_push_pull,
+        .AltFunc = GPIO_AF7};
+    MGPIO_vInit(&tx);
+
+    GPIOx_PinConfig_t rx = {
+        .Port = GPIO_PORTA,
+        .Pin = GPIO_PIN10,
+        .Mode = GPIO_ALF,
+        .PullType = GPIO_OT_NOPULL,
+        .AltFunc = GPIO_AF7};
+    MGPIO_vInit(&rx);
+
     MUSART_vInit();
-    MUSART_vSendString("SYSTEM READY\r\n");
+    MUSART_vSendString("System started\r\n");
+    /* Configure SPI1 pins before starting the IMU. */
+    GPIOx_PinConfig_t SCK = {
+        .Port = GPIO_PORTA,
+        .Pin = GPIO_PIN5,
+        .Mode = GPIO_ALF,
+        .OutputSpeed = Output_high_speed,
+        .OutputType = OUTPUT_push_pull,
+        .PullType = GPIO_OT_NOPULL,
+        .AltFunc = GPIO_AF5};
+    MGPIO_vInit(&SCK);
 
-    MADC_vInit();
+    GPIOx_PinConfig_t MISO = {
+        .Port = GPIO_PORTA,
+        .Pin = GPIO_PIN6,
+        .Mode = GPIO_ALF,
+        .AltFunc = GPIO_AF5,
+        .PullType = GPIO_OT_NOPULL};
+    MGPIO_vInit(&MISO);
 
-    HHeartRate_vInit();
+    GPIOx_PinConfig_t MOSI = {
+        .Port = GPIO_PORTA,
+        .Pin = GPIO_PIN7,
+        .Mode = GPIO_ALF,
+        .AltFunc = GPIO_AF5,
+        .OutputSpeed = Output_high_speed,
+        .OutputType = OUTPUT_push_pull,
+        .PullType = GPIO_OT_NOPULL};
+    MGPIO_vInit(&MOSI);
 
-    xTaskCreate(HeartRateTask, "HeartRate", 256U, NULL, 2U, NULL);
-    vTaskStartScheduler();
+    MSPI_vInit();
 
-    for (;;)
+    HIMU_vInit();
+    MUSART_vSendString("IMU_ID=");
+    UART_vSendNumber(HIMU_u8ReadDEVID());
+    MUSART_vSendString("\r\n");
+
+    u8 stepEvent;
+    u8 activityStatus = 0U;
+    u8 prevActivityStatus = 0xFFU; /* Force initial state print */
+
+    u8 counter = 0U;
+    /*u32 X_ACC;
+    u32 Y_ACC;
+    u32 Z_ACC;
+    u32 ACC_MAG;*/
+
+    MUSART_vSendString("Steps=");
+    UART_vSendNumber(0);
+    MUSART_vSendString("\r\n");
+    HTFT_vInit();
+    HTFT_vFillBackgroundColor(0x0000);
+    while (1)
     {
+        /*
+        //  * Polling avoids making USART output depend on the sensor interrupt
+        //  * wiring. The ADXL345 data is sampled at a controlled rate instead.
+        //  */
+        activityStatus = HIMU_u8ActivityStatus();
+
+        stepEvent = HIMU_u8StepCounter();
+        if (stepEvent == 1U)
+        {
+            counter = (counter < 255U) ? (counter + 1U) : 0U;
+            MUSART_vSendString("Steps=");
+            UART_vSendNumber(counter);
+            HTFT_vWriteNumber(2, 5 ,counter, 0xFFFF);
+            MUSART_vSendString("\r\n");
+            stepEvent = 0;
+        }
+
+        if (activityStatus == prevActivityStatus)
+        {
+            MSYSTICK_vStartTimer(5000);
+        }
+        u32 time_passed = MSYSTICK_u32GetElapsedTime_SingleShot();
+        if (((activityStatus == prevActivityStatus) && time_passed > 1000) || (activityStatus != prevActivityStatus))
+        {
+            MSYSTICK_vStopTimer();
+            prevActivityStatus = activityStatus;
+            switch (activityStatus)
+            {
+            case 0U:
+                MUSART_vSendString("Status: Stopped\r\n");
+                break;
+            case 1U:
+                MUSART_vSendString("Status: SLOW Walk\r\n");
+
+                break;
+            case 2U:
+                MUSART_vSendString("Status: Mid Walk\r\n");
+
+                break;
+            case 3U:
+                MUSART_vSendString("Status: Running\r\n");
+
+                break;
+            default:
+                MUSART_vSendString("Status: NOTHING\r\n");
+
+                break;
+            }
+        }
+
+        /* X_ACC = HIMU_s16ReadXData();
+         Y_ACC = HIMU_s16ReadYData();
+         Z_ACC = HIMU_s16ReadZData();
+         ACC_MAG = IMU_u32MagnitudeMg(X_ACC, Y_ACC, Z_ACC);
+
+         UART_vSendNumber(ACC_MAG);
+         MUSART_vSendString("\r\n");*/
+
+        MSYSTICK_vSetDelay_ms(200U);
     }
+
+    return 0;
 }
