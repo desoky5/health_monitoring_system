@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Forward STM32 heart-rate UART messages to the hosted dashboard API."""
+"""Forward STM32 health measurements to the hosted dashboard API."""
 
 import json
 import re
@@ -15,10 +15,16 @@ API_URL = "http://healthmonitoringembedded.atwebpages.com/api.php"
 REQUEST_TIMEOUT_SECONDS = 10
 
 BPM_PATTERN = re.compile(r"\bBPM\s*:\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
+DATA_PATTERN = re.compile(
+    r"\bDATA\s*:\s*BPM\s*=\s*(\d+(?:\.\d+)?)\s*,\s*"
+    r"STEPS\s*=\s*(\d+(?:\.\d+)?)\s*,\s*"
+    r"ACC\s*=\s*(\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
 
 
-def publish_heart_rate(heart_rate):
-    payload = json.dumps({"heartRate": heart_rate}).encode("utf-8")
+def publish_measurements(measurements):
+    payload = json.dumps(measurements).encode("utf-8")
     request = urllib.request.Request(
         API_URL,
         data=payload,
@@ -43,16 +49,25 @@ def main():
 
             line = raw_line.decode("ascii", errors="replace").strip()
             print(f"STM32: {line}")
-            match = BPM_PATTERN.search(line)
-            if not match:
-                continue
+            data_match = DATA_PATTERN.search(line)
+            if data_match:
+                measurements = {
+                    "heartRate": float(data_match.group(1)),
+                    "steps": float(data_match.group(2)),
+                    "acceleration": float(data_match.group(3)),
+                }
+            else:
+                bpm_match = BPM_PATTERN.search(line)
+                if not bpm_match:
+                    continue
+                measurements = {"heartRate": float(bpm_match.group(1))}
 
-            heart_rate = float(match.group(1))
-            if heart_rate.is_integer():
-                heart_rate = int(heart_rate)
+            for key, value in list(measurements.items()):
+                if value.is_integer():
+                    measurements[key] = int(value)
 
             try:
-                result = publish_heart_rate(heart_rate)
+                result = publish_measurements(measurements)
                 print(f"Dashboard: {result}")
             except (OSError, urllib.error.URLError, RuntimeError) as error:
                 print(f"Dashboard update failed: {error}")

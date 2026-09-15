@@ -12,11 +12,11 @@
 #include "../../MCAL/SPI/SPI_int.h"
 
 #include "TFT_int.h"
-
+// length of the characters take 6 positions
 GPIOx_PinConfig_t TFT_RST_PIN =
 {
-		.Port = GPIO_PORTA,
-		.Pin = GPIO_PIN0,
+		.Port = GPIO_PORTB,
+		.Pin = GPIO_PIN12,
 		.Mode =GPIO_Output,
 		.OutputType = OUTPUT_push_pull,
 		.OutputSpeed = Output_high_speed
@@ -25,8 +25,8 @@ GPIOx_PinConfig_t TFT_RST_PIN =
 
 GPIOx_PinConfig_t TFT_A0_PIN =
 {
-		.Port = GPIO_PORTA,
-		.Pin = GPIO_PIN1,
+		.Port = GPIO_PORTB,
+		.Pin = GPIO_PIN13,
 		.Mode =GPIO_Output,
 		.OutputType = OUTPUT_push_pull,
 		.OutputSpeed = Output_high_speed
@@ -61,12 +61,12 @@ static void Reset_seq(void)
 static void write_cmd(u8  A_u8cmd)
 {
 	MGPIO_vSetPinVal(TFT_A0_PIN.Port,TFT_A0_PIN.Pin,GPIO_LOW);
-	(void)MSPI_u8Transcieve(A_u8cmd);
+	(void)MSPI2_u8Transcieve(A_u8cmd);
 }
 static void write_data(u8  A_u8data)
 {
 	MGPIO_vSetPinVal(TFT_A0_PIN.Port,TFT_A0_PIN.Pin,GPIO_HIGH);
-	(void)MSPI_u8Transcieve(A_u8data);
+	(void)MSPI2_u8Transcieve(A_u8data);
 }
 
 	void HTFT_vInit(void)
@@ -74,7 +74,7 @@ static void write_data(u8  A_u8data)
 	MGPIO_vInit(&TFT_A0_PIN);
 	MGPIO_vInit(&TFT_RST_PIN);
 
-	MSPI_vInit();
+	MSPI2_vInit();
 	//RESET
 	Reset_seq();
 
@@ -233,9 +233,9 @@ static void TFT_vWritePixel(u16 A_u16X, u16 A_u16Y, u16 A_u16Color)
 
 	HTFT_vSetXPos(A_u16X, A_u16X);
 	HTFT_vSetYPos(A_u16Y, A_u16Y);
-	Write_cmd(0x2C);
-	Write_data((u8)(A_u16Color >> 8));
-	Write_data((u8)A_u16Color);
+	write_cmd(0x2C);
+	write_data((u8)(A_u16Color >> 8));
+	write_data((u8)A_u16Color);
 }
 
 void HTFT_vWriteText(u16 A_u16X, u16 A_u16Y, const char *A_pcText, u16 A_u16Color)
@@ -291,3 +291,53 @@ void HTFT_vWriteText(u16 A_u16X, u16 A_u16Y, const char *A_pcText, u16 A_u16Colo
 		}
 	}
 }
+
+
+void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color)
+{
+	char Local_acNumber[12];
+	u32 Local_u32Magnitude;
+	u8 Local_u8Index = 0;
+	u8 Local_u8IsNegative = 0;
+
+	if(A_s32Number < 0)
+	{
+		Local_u8IsNegative = 1;
+		Local_u32Magnitude = 0u - (u32)A_s32Number;
+	}
+	else
+	{
+		Local_u32Magnitude = (u32)A_s32Number;
+	}
+
+	do
+	{
+		Local_acNumber[Local_u8Index++] =
+			(char)('0' + (Local_u32Magnitude % 10u));
+		Local_u32Magnitude /= 10u;
+	} while(Local_u32Magnitude != 0u);
+
+	if(Local_u8IsNegative != 0u)
+	{
+		Local_acNumber[Local_u8Index++] = '-';
+	}
+
+	Local_acNumber[Local_u8Index] = '\0';
+
+	{
+		u8 Local_u8Left = 0;
+		u8 Local_u8Right = Local_u8Index - 1u;
+
+		while(Local_u8Left < Local_u8Right)
+		{
+			char Local_cTemp = Local_acNumber[Local_u8Left];
+			Local_acNumber[Local_u8Left] = Local_acNumber[Local_u8Right];
+			Local_acNumber[Local_u8Right] = Local_cTemp;
+			Local_u8Left++;
+			Local_u8Right--;
+		}
+	}
+
+	HTFT_vWriteText(A_u16X, A_u16Y, Local_acNumber, A_u16Color);
+}
+

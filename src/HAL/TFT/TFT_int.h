@@ -15,6 +15,7 @@ void HTFT_vSetYPos(u16 A_u16yStart, u16 A_u16yEnd);
 void HTFT_vFillBackgroundColor(u16 A_u16Color);
 void HTFT_vFillRectangle(u16 A_u16Color);
 void HTFT_vWriteText(u16 A_u16X, u16 A_u16Y, const char *A_pcText, u16 A_u16Color);
+void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color);
 
 #define RESET_BIT_PORT GPIO_PORTA
 #define RESET_BIT GPIO_PIN0
