@@ -18,14 +18,18 @@
 #define MOTION_TASK_PERIOD_MS      100U
 #define DISPLAY_TASK_PERIOD_MS     500U
 #define UART_TASK_PERIOD_MS        1000U
+#define NAVIGATION_TASK_PERIOD_MS  20U
 #define USART1_CLOCK_BIT           4U
 #define SCB_CPACR                  (*(volatile u32*)0xE000ED88U)
+#define HEART_RATE_PAGE             0U
+#define MOTION_PAGE                 1U
 
 typedef struct
 {
     u16 HeartRateBpm;
     u32 StepCount;
     u32 AccelerationMg;
+    u8 SelectedPage;
 } Measurements_t;
 
 static Measurements_t G_xMeasurements;
@@ -38,6 +42,7 @@ static void HeartRateTask(void* A_pvParameters);
 static void MotionTask(void* A_pvParameters);
 static void DisplayTask(void* A_pvParameters);
 static void UartTask(void* A_pvParameters);
+static void NavigationTask(void* A_pvParameters);
 
 static void Peripherals_vInit(void)
 {
@@ -48,6 +53,7 @@ static void Peripherals_vInit(void)
     GPIOx_PinConfig_t L_xImuMosi = { .Port = GPIO_PORTA, .Pin = GPIO_PIN7, .Mode = GPIO_ALF, .OutputSpeed = Output_high_speed, .OutputType = OUTPUT_push_pull, .PullType = GPIO_OT_NOPULL, .AltFunc = GPIO_AF5 };
     GPIOx_PinConfig_t L_xUartTx = { .Port = GPIO_PORTA, .Pin = GPIO_PIN9, .Mode = GPIO_ALF, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_high_speed, .PullType = GPIO_OT_NOPULL, .AltFunc = GPIO_AF7 };
     GPIOx_PinConfig_t L_xUartRx = { .Port = GPIO_PORTA, .Pin = GPIO_PIN10, .Mode = GPIO_ALF, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_high_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF7 };
+    GPIOx_PinConfig_t L_xNavigationButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN2, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
 
     MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOA);
     MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOB);
@@ -61,6 +67,7 @@ static void Peripherals_vInit(void)
     MGPIO_vInit(&L_xImuMosi);
     MGPIO_vInit(&L_xUartTx);
     MGPIO_vInit(&L_xUartRx);
+    MGPIO_vInit(&L_xNavigationButton);
     MSPI_vInit();
     HIMU_vInit();
     HTFT_vInit();
@@ -169,14 +176,50 @@ static void DisplayTask(void* A_pvParameters)
     {
         Measurements_vGetSnapshot(&L_xSnapshot);
         HTFT_vFillBackgroundColor(TFT_COLOR_BLACK);
-        HTFT_vWriteText(0U, 0U, "Health Monitor", TFT_COLOR_WHITE);
-        HTFT_vWriteText(0U, 35U, "BPM:", TFT_COLOR_WHITE);
-        HTFT_vWriteNumber(80U, 35U, (s32)L_xSnapshot.HeartRateBpm, TFT_COLOR_GREEN);
-        HTFT_vWriteText(0U, 75U, "Steps:", TFT_COLOR_WHITE);
-        HTFT_vWriteNumber(80U, 75U, (s32)L_xSnapshot.StepCount, TFT_COLOR_YELLOW);
-        HTFT_vWriteText(0U, 115U, "Accel mg:", TFT_COLOR_WHITE);
-        HTFT_vWriteNumber(120U, 115U, (s32)L_xSnapshot.AccelerationMg, TFT_COLOR_CYAN);
+        if (L_xSnapshot.SelectedPage == HEART_RATE_PAGE)
+        {
+            HTFT_vWriteText(0U, 0U, "Heart Rate", TFT_COLOR_WHITE);
+            HTFT_vWriteText(0U, 50U, "BPM:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(60U, 50U, (s32)L_xSnapshot.HeartRateBpm, TFT_COLOR_GREEN);
+        }
+        else
+        {
+            HTFT_vWriteText(0U, 0U, "Steps Counter", TFT_COLOR_WHITE);
+            HTFT_vWriteText(0U, 50U, "Steps:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(70U, 50U, (s32)L_xSnapshot.StepCount, TFT_COLOR_YELLOW);
+            HTFT_vWriteText(0U, 90U, "Accel mg:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(95U, 90U, (s32)L_xSnapshot.AccelerationMg, TFT_COLOR_CYAN);
+        }
         vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(DISPLAY_TASK_PERIOD_MS));
+    }
+}
+
+static void NavigationTask(void* A_pvParameters)
+{
+    TickType_t L_xLastWakeTime = xTaskGetTickCount();
+    u8 L_u8ButtonWasPressed = 0U;
+    (void)A_pvParameters;
+
+    for (;;)
+    {
+        if (MGPIO_u8GetPinVal(GPIO_PORTB, GPIO_PIN2) == GPIO_LOW)
+        {
+            if (L_u8ButtonWasPressed == 0U)
+            {
+                L_u8ButtonWasPressed = 1U;
+                if (xSemaphoreTake(G_xMeasurementsMutex, portMAX_DELAY) == pdTRUE)
+                {
+                    G_xMeasurements.SelectedPage =
+                        (G_xMeasurements.SelectedPage == HEART_RATE_PAGE) ? MOTION_PAGE : HEART_RATE_PAGE;
+                    (void)xSemaphoreGive(G_xMeasurementsMutex);
+                }
+            }
+        }
+        else
+        {
+            L_u8ButtonWasPressed = 0U;
+        }
+        vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(NAVIGATION_TASK_PERIOD_MS));
     }
 }
 
@@ -224,6 +267,7 @@ int main(void)
     (void)xTaskCreate(MotionTask, "Motion", 256U, NULL, 2U, NULL);
     (void)xTaskCreate(DisplayTask, "Display", 256U, NULL, 1U, NULL);
     (void)xTaskCreate(UartTask, "UART", 256U, NULL, 1U, NULL);
+    (void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
     vTaskStartScheduler();
 
     for (;;)
