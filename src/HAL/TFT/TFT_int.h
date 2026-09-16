@@ -28,6 +28,9 @@ void HTFT_vFillBackgroundColor(u16 A_u16Color);
 void HTFT_vFillRectangle(u16 A_u16Color);
 void HTFT_vWriteText(u16 A_u16X, u16 A_u16Y, const char *A_pcText, u16 A_u16Color);
 void HTFT_vWriteNumber(u16 A_u16X, u16 A_u16Y, s32 A_s32Number, u16 A_u16Color);
+void HTFT_vDrawFilledRect(u16 A_u16X, u16 A_u16Y, u16 A_u16Width, u16 A_u16Height, u16 A_u16Color);
+void HTFT_vDrawRectOutline(u16 A_u16X, u16 A_u16Y, u16 A_u16Width, u16 A_u16Height, u16 A_u16Color);
+void HTFT_vDrawBitmap(u16 A_u16X, u16 A_u16Y, u8 A_u8Width, u8 A_u8Height, const u8* A_pu8Bitmap, u16 A_u16Color, u8 A_u8Scale);
 
 #define RESET_BIT_PORT GPIO_PORTB
 #define RESET_BIT GPIO_PIN12
