@@ -26,7 +26,7 @@
 #define SCB_CPACR                  (*(volatile u32*)0xE000ED88U)
 #define HEART_RATE_PAGE             0U
 #define MOTION_PAGE                 1U
-#define STEP_GOAL_COUNT             10000U
+#define STEP_GOAL_COUNT             10U
 #define BPM_LOW_THRESHOLD           60U
 #define BPM_HIGH_THRESHOLD          100U
 #define BPM_SCALE_MAX               180U
@@ -36,6 +36,8 @@
 #define PROGRESS_BAR_HEIGHT         14U
 #define RESET_TASK_PERIOD_MS       20U
 #define POWER_TASK_PERIOD_MS       20U
+#define BUZZER_TASK_PERIOD_MS       2000U
+
 
 /* 7x7 heart glyph, one byte per row (MSB = leftmost pixel). */
 static const u8 G_au8HeartIcon[7] = { 0x36U, 0x7FU, 0x7FU, 0x3EU, 0x1CU, 0x08U, 0x00U };
@@ -72,6 +74,7 @@ static void Display_LEDMATRIX(void* A_pvParameters);
 static void ResetTask(void* A_pvParameters);
 static void PowerTask(void* A_pvParameters);
 static u8 Power_u8GetState(void);
+static void BuzzerTask(void* A_pvParameters);
 
 static void Peripherals_vInit(void)
 {
@@ -85,6 +88,7 @@ static void Peripherals_vInit(void)
 	GPIOx_PinConfig_t L_xNavigationButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN2, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
 	GPIOx_PinConfig_t L_xResetButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN1, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
 	GPIOx_PinConfig_t L_xPowerButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN0, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
+	GPIOx_PinConfig_t BUZZER_PIN =	{   .Port = GPIO_PORTB, .Pin = GPIO_PIN5, .Mode = GPIO_Output, .OutputType = OUTPUT_push_pull,.OutputSpeed = Output_high_speed};
 
 	MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOA);
 	MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOB);
@@ -101,6 +105,7 @@ static void Peripherals_vInit(void)
 	MGPIO_vInit(&L_xNavigationButton);
 	MGPIO_vInit(&L_xResetButton);
 	MGPIO_vInit(&L_xPowerButton);
+	MGPIO_vInit(&BUZZER_PIN);
 	MSPI_vInit();
 	HIMU_vInit();
 	HTFT_vInit();
@@ -520,6 +525,42 @@ static void PowerTask(void* A_pvParameters)
 		vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(POWER_TASK_PERIOD_MS));
 	}
 }
+
+static void BuzzerTask(void *pvParameters)
+{
+	TickType_t L_xLastWakeTime = xTaskGetTickCount();
+	Measurements_t L_xSnapshot;
+	(void)pvParameters;
+
+	for (;;)
+	{
+		if (xSemaphoreTake(G_xMeasurementsMutex, portMAX_DELAY) == pdTRUE)
+		{
+			L_xSnapshot = G_xMeasurements;
+			(void)xSemaphoreGive(G_xMeasurementsMutex);
+		}
+		else
+		{
+			vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(BUZZER_TASK_PERIOD_MS));
+			continue;
+		}
+
+		if ((L_xSnapshot.StepCount >= STEP_GOAL_COUNT) ||
+		    ((L_xSnapshot.HeartRateBpm != 0U) &&
+		     ((L_xSnapshot.HeartRateBpm > BPM_HIGH_THRESHOLD) ||
+		      (L_xSnapshot.HeartRateBpm < BPM_LOW_THRESHOLD))))
+		{
+			HTFT_vWriteText(20,20,"GOAL REACHED", TFT_COLOR_WHITE);
+			MGPIO_vSetPinVal(GPIO_PORTB, GPIO_PIN5, GPIO_HIGH);
+			vTaskDelay(pdMS_TO_TICKS(1000U));
+			MGPIO_vSetPinVal(GPIO_PORTB, GPIO_PIN5, GPIO_LOW);
+			HTFT_vWriteText(20,20,"GOAL REACHED", TFT_COLOR_BLACK);
+		}
+
+		vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(BUZZER_TASK_PERIOD_MS));
+	}
+}
+
 int main(void)
 {
 	SCB_CPACR |= (0xFU << 20U);
@@ -549,7 +590,7 @@ int main(void)
 	(void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
 	(void)xTaskCreate(ResetTask, "Reset", 128U, NULL, 2U, NULL);
 	(void)xTaskCreate(PowerTask, "Power", 128U, NULL, 2U, NULL);
-
+	(void)xTaskCreate(BuzzerTask, "Buzzer", 128U, NULL, 2U, NULL);
 	vTaskStartScheduler();
 
 	for (;;)
