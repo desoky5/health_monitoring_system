@@ -9,6 +9,9 @@
 
 #include "../../MCAL/GPIO/GPIO_int.h"
 #include "../../MCAL/SYSTICK/SYSTICK_int.h"
+#include "../../HAL/S2P/S2P_int.h"
+
+
 
 #include "LEDMATRIX_int.h"
 #include "LEDMATRIX_cfg.h"
@@ -82,4 +85,31 @@ static void HLEDMATRIX_vSetRowValue(u8 A_u8RowValue)
 		{
 			MGPIO_vSetPinVal(Rows[i].Port ,Rows[i].Pin, GET_BIT(A_u8RowValue,i));
 		}
+}
+
+void HLEDMATRIX_vDisplayFrameS2P(u8 A_u8Frame[], u32 A_u32FrameDelay, u8 A_u8ColNo, S2P_Init_t *S2P_Init)
+{
+
+	MSYSTIC_Config_t STK_cfg = {
+		.InterruptEnable = INT_DISABLE,
+		.CLK_SRC = CLK_SRC_AHB_8};
+
+	MSYSTICK_vInit(&STK_cfg);
+	u8 rowValue = 0;
+	u16 sendValue = 0;
+	u8 colmnValue = 0xFF;
+	for (u32 j = 0; j < A_u32FrameDelay; j++)
+	{
+		for (u8 i = 0; i < A_u8ColNo; i++)
+		{
+			rowValue = A_u8Frame[i];
+
+			colmnValue = 0xFF;
+			CLR_BIT(colmnValue, i);
+
+			sendValue = ((u16)rowValue << 8) | colmnValue;
+			HS2P_vSendData(S2P_Init, sendValue);
+			MSYSTICK_vSetDelay_ms(SCAN_TIME);
+		}
+	}
 }

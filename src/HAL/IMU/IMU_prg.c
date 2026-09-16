@@ -140,7 +140,10 @@ u32 IMU_u32MagnitudeMg(s16 A_s16X, s16 A_s16Y, s16 A_s16Z)
 	L_u32Magnitude = integer_sqrt(L_u32MagnitudeSquared);
 
 	/* DATA_FORMAT is full-resolution +/-2 g: 1 count is approximately 4 mg. */
-	return L_u32Magnitude * 4U;
+	L_u32Magnitude*= 4U;
+	L_u32Magnitude/=1000;
+	L_u32Magnitude--;
+	return L_u32Magnitude ;
 }
 
 void HIMU_vInit(void)
@@ -197,7 +200,7 @@ void HIMU_vInit(void)
 	IMU_u8ReadReg(ADXL345_DEVID);
 }
 
-s32 HIMU_s16ReadXData(void)
+s16 HIMU_s16ReadXData(void)
 {
 
 	s16 L_s16X;
