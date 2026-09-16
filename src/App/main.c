@@ -16,7 +16,7 @@
 
 #define HEART_RATE_TASK_PERIOD_MS  10U
 #define MOTION_TASK_PERIOD_MS      100U
-#define DISPLAY_TASK_PERIOD_MS     500U
+#define DISPLAY_TASK_PERIOD_MS     100U
 #define UART_TASK_PERIOD_MS        1000U
 #define NAVIGATION_TASK_PERIOD_MS  20U
 #define USART1_CLOCK_BIT           4U
@@ -215,25 +215,45 @@ static void DisplayTask(void* A_pvParameters)
     Measurements_t L_xSnapshot;
     u16 L_u16StatusColor;
     u16 L_u16BarFillWidth;
+    u8 L_u8PrevPage = 0xFFU;
     (void)A_pvParameters;
 
     for (;;)
     {
         Measurements_vGetSnapshot(&L_xSnapshot);
-        HTFT_vFillBackgroundColor(TFT_COLOR_BLACK);
-        HTFT_vDrawRectOutline(0U, 0U, 128U, 160U, TFT_COLOR_GRAY);
+
+        /* Only repaint the full page (border/labels/outlines) when the page actually changes. */
+        if (L_xSnapshot.SelectedPage != L_u8PrevPage)
+        {
+            L_u8PrevPage = L_xSnapshot.SelectedPage;
+            HTFT_vFillBackgroundColor(TFT_COLOR_BLACK);
+            HTFT_vDrawRectOutline(0U, 0U, 128U, 160U, TFT_COLOR_GRAY);
+
+            if (L_xSnapshot.SelectedPage == HEART_RATE_PAGE)
+            {
+                HTFT_vWriteText(6U, 6U, "Heart Rate", TFT_COLOR_WHITE);
+                HTFT_vDrawBitmap(96U, 4U, 7U, 7U, G_au8HeartIcon, TFT_COLOR_RED, 2U);
+                HTFT_vWriteText(6U, 55U, "BPM:", TFT_COLOR_WHITE);
+                HTFT_vDrawRectOutline(PROGRESS_BAR_X, 125U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+            }
+            else
+            {
+                HTFT_vWriteText(6U, 6U, "Steps Counter", TFT_COLOR_WHITE);
+                HTFT_vWriteText(6U, 40U, "Steps:", TFT_COLOR_WHITE);
+                HTFT_vDrawRectOutline(PROGRESS_BAR_X, 60U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+                HTFT_vWriteText(6U, 100U, "Accel mg:", TFT_COLOR_WHITE);
+            }
+        }
 
         if (L_xSnapshot.SelectedPage == HEART_RATE_PAGE)
         {
             L_u16StatusColor = HeartRate_u16GetStatusColor(L_xSnapshot.HeartRateBpm);
 
-            HTFT_vWriteText(6U, 6U, "Heart Rate", TFT_COLOR_WHITE);
-            HTFT_vDrawBitmap(96U, 4U, 7U, 7U, G_au8HeartIcon, TFT_COLOR_RED, 2U);
-
-            HTFT_vWriteText(6U, 55U, "BPM:", TFT_COLOR_WHITE);
+            HTFT_vDrawFilledRect(66U, 55U, 40U, 9U, TFT_COLOR_BLACK);
             HTFT_vWriteNumber(66U, 55U, (s32)L_xSnapshot.HeartRateBpm, L_u16StatusColor);
 
-            HTFT_vDrawRectOutline(PROGRESS_BAR_X, 125U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+            HTFT_vDrawFilledRect((u16)(PROGRESS_BAR_X + 1U), 126U, (u16)(PROGRESS_BAR_WIDTH - 2U),
+                                 (u16)(PROGRESS_BAR_HEIGHT - 2U), TFT_COLOR_BLACK);
             L_u16BarFillWidth = Display_u16ProgressWidth(L_xSnapshot.HeartRateBpm, BPM_SCALE_MAX, (u16)(PROGRESS_BAR_WIDTH - 2U));
             if (L_u16BarFillWidth > 0U)
             {
@@ -243,11 +263,11 @@ static void DisplayTask(void* A_pvParameters)
         }
         else
         {
-            HTFT_vWriteText(6U, 6U, "Steps Counter", TFT_COLOR_WHITE);
-            HTFT_vWriteText(6U, 40U, "Steps:", TFT_COLOR_WHITE);
+            HTFT_vDrawFilledRect(76U, 40U, 46U, 9U, TFT_COLOR_BLACK);
             HTFT_vWriteNumber(76U, 40U, (s32)L_xSnapshot.StepCount, TFT_COLOR_YELLOW);
 
-            HTFT_vDrawRectOutline(PROGRESS_BAR_X, 60U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+            HTFT_vDrawFilledRect((u16)(PROGRESS_BAR_X + 1U), 61U, (u16)(PROGRESS_BAR_WIDTH - 2U),
+                                 (u16)(PROGRESS_BAR_HEIGHT - 2U), TFT_COLOR_BLACK);
             L_u16BarFillWidth = Display_u16ProgressWidth(L_xSnapshot.StepCount, STEP_GOAL_COUNT, (u16)(PROGRESS_BAR_WIDTH - 2U));
             if (L_u16BarFillWidth > 0U)
             {
@@ -255,7 +275,7 @@ static void DisplayTask(void* A_pvParameters)
                                      (u16)(PROGRESS_BAR_HEIGHT - 2U), TFT_COLOR_YELLOW);
             }
 
-            HTFT_vWriteText(6U, 100U, "Accel mg:", TFT_COLOR_WHITE);
+            HTFT_vDrawFilledRect(66U, 100U, 48U, 9U, TFT_COLOR_BLACK);
             HTFT_vWriteNumber(66U, 100U, (s32)L_xSnapshot.AccelerationMg, TFT_COLOR_CYAN);
 
             if (L_xSnapshot.AccelerationMg >= MOTION_THRESHOLD_MG)

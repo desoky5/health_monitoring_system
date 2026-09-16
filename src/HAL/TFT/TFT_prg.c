@@ -26,7 +26,7 @@ GPIOx_PinConfig_t TFT_RST_PIN =
 GPIOx_PinConfig_t TFT_A0_PIN =
 {
 		.Port = GPIO_PORTB,
-		.Pin = GPIO_PIN11,
+		.Pin = GPIO_PIN13,
 		.Mode =GPIO_Output,
 		.OutputType = OUTPUT_push_pull,
 		.OutputSpeed = Output_high_speed
