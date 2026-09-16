@@ -23,6 +23,17 @@
 #define SCB_CPACR                  (*(volatile u32*)0xE000ED88U)
 #define HEART_RATE_PAGE             0U
 #define MOTION_PAGE                 1U
+#define STEP_GOAL_COUNT             10000U
+#define BPM_LOW_THRESHOLD           60U
+#define BPM_HIGH_THRESHOLD          100U
+#define BPM_SCALE_MAX               180U
+#define MOTION_THRESHOLD_MG         1200U
+#define PROGRESS_BAR_X              8U
+#define PROGRESS_BAR_WIDTH          112U
+#define PROGRESS_BAR_HEIGHT         14U
+
+/* 7x7 heart glyph, one byte per row (MSB = leftmost pixel). */
+static const u8 G_au8HeartIcon[7] = { 0x36U, 0x7FU, 0x7FU, 0x3EU, 0x1CU, 0x08U, 0x00U };
 
 typedef struct
 {
@@ -43,6 +54,8 @@ static void MotionTask(void* A_pvParameters);
 static void DisplayTask(void* A_pvParameters);
 static void UartTask(void* A_pvParameters);
 static void NavigationTask(void* A_pvParameters);
+static u16 HeartRate_u16GetStatusColor(u16 A_u16Bpm);
+static u16 Display_u16ProgressWidth(u32 A_u32Value, u32 A_u32Max, u16 A_u16BarWidth);
 
 static void Peripherals_vInit(void)
 {
@@ -166,29 +179,95 @@ static void MotionTask(void* A_pvParameters)
     }
 }
 
+static u16 HeartRate_u16GetStatusColor(u16 A_u16Bpm)
+{
+    u16 L_u16Color;
+
+    if (A_u16Bpm == 0U)
+    {
+        L_u16Color = TFT_COLOR_GRAY;
+    }
+    else if (A_u16Bpm < BPM_LOW_THRESHOLD)
+    {
+        L_u16Color = TFT_COLOR_CYAN;
+    }
+    else if (A_u16Bpm > BPM_HIGH_THRESHOLD)
+    {
+        L_u16Color = TFT_COLOR_ORANGE;
+    }
+    else
+    {
+        L_u16Color = TFT_COLOR_GREEN;
+    }
+
+    return L_u16Color;
+}
+
+static u16 Display_u16ProgressWidth(u32 A_u32Value, u32 A_u32Max, u16 A_u16BarWidth)
+{
+    u32 L_u32Clamped = (A_u32Value > A_u32Max) ? A_u32Max : A_u32Value;
+    return (u16)((L_u32Clamped * A_u16BarWidth) / A_u32Max);
+}
+
 static void DisplayTask(void* A_pvParameters)
 {
     TickType_t L_xLastWakeTime = xTaskGetTickCount();
     Measurements_t L_xSnapshot;
+    u16 L_u16StatusColor;
+    u16 L_u16BarFillWidth;
     (void)A_pvParameters;
 
     for (;;)
     {
         Measurements_vGetSnapshot(&L_xSnapshot);
         HTFT_vFillBackgroundColor(TFT_COLOR_BLACK);
+        HTFT_vDrawRectOutline(0U, 0U, 128U, 160U, TFT_COLOR_GRAY);
+
         if (L_xSnapshot.SelectedPage == HEART_RATE_PAGE)
         {
-            HTFT_vWriteText(0U, 0U, "Heart Rate", TFT_COLOR_WHITE);
-            HTFT_vWriteText(0U, 50U, "BPM:", TFT_COLOR_WHITE);
-            HTFT_vWriteNumber(60U, 50U, (s32)L_xSnapshot.HeartRateBpm, TFT_COLOR_GREEN);
+            L_u16StatusColor = HeartRate_u16GetStatusColor(L_xSnapshot.HeartRateBpm);
+
+            HTFT_vWriteText(6U, 6U, "Heart Rate", TFT_COLOR_WHITE);
+            HTFT_vDrawBitmap(96U, 4U, 7U, 7U, G_au8HeartIcon, TFT_COLOR_RED, 2U);
+
+            HTFT_vWriteText(6U, 55U, "BPM:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(66U, 55U, (s32)L_xSnapshot.HeartRateBpm, L_u16StatusColor);
+
+            HTFT_vDrawRectOutline(PROGRESS_BAR_X, 125U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+            L_u16BarFillWidth = Display_u16ProgressWidth(L_xSnapshot.HeartRateBpm, BPM_SCALE_MAX, (u16)(PROGRESS_BAR_WIDTH - 2U));
+            if (L_u16BarFillWidth > 0U)
+            {
+                HTFT_vDrawFilledRect((u16)(PROGRESS_BAR_X + 1U), 126U, L_u16BarFillWidth,
+                                     (u16)(PROGRESS_BAR_HEIGHT - 2U), L_u16StatusColor);
+            }
         }
         else
         {
-            HTFT_vWriteText(0U, 0U, "Steps Counter", TFT_COLOR_WHITE);
-            HTFT_vWriteText(0U, 50U, "Steps:", TFT_COLOR_WHITE);
-            HTFT_vWriteNumber(70U, 50U, (s32)L_xSnapshot.StepCount, TFT_COLOR_YELLOW);
-            HTFT_vWriteText(0U, 90U, "Accel mg:", TFT_COLOR_WHITE);
-            HTFT_vWriteNumber(95U, 90U, (s32)L_xSnapshot.AccelerationMg, TFT_COLOR_CYAN);
+            HTFT_vWriteText(6U, 6U, "Steps Counter", TFT_COLOR_WHITE);
+            HTFT_vWriteText(6U, 40U, "Steps:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(76U, 40U, (s32)L_xSnapshot.StepCount, TFT_COLOR_YELLOW);
+
+            HTFT_vDrawRectOutline(PROGRESS_BAR_X, 60U, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_COLOR_WHITE);
+            L_u16BarFillWidth = Display_u16ProgressWidth(L_xSnapshot.StepCount, STEP_GOAL_COUNT, (u16)(PROGRESS_BAR_WIDTH - 2U));
+            if (L_u16BarFillWidth > 0U)
+            {
+                HTFT_vDrawFilledRect((u16)(PROGRESS_BAR_X + 1U), 61U, L_u16BarFillWidth,
+                                     (u16)(PROGRESS_BAR_HEIGHT - 2U), TFT_COLOR_YELLOW);
+            }
+
+            HTFT_vWriteText(6U, 100U, "Accel mg:", TFT_COLOR_WHITE);
+            HTFT_vWriteNumber(66U, 100U, (s32)L_xSnapshot.AccelerationMg, TFT_COLOR_CYAN);
+
+            if (L_xSnapshot.AccelerationMg >= MOTION_THRESHOLD_MG)
+            {
+                HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_ORANGE);
+                HTFT_vWriteText(32U, 137U, "MOVING", TFT_COLOR_ORANGE);
+            }
+            else
+            {
+                HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_GREEN);
+                HTFT_vWriteText(32U, 137U, "STILL", TFT_COLOR_GREEN);
+            }
         }
         vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(DISPLAY_TASK_PERIOD_MS));
     }

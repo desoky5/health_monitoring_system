@@ -161,6 +161,63 @@ void HTFT_vFillRectangle(u16 A_u16Color)
 	}
 
 }
+
+void HTFT_vDrawFilledRect(u16 A_u16X, u16 A_u16Y, u16 A_u16Width, u16 A_u16Height, u16 A_u16Color)
+{
+	u8 MSB = (u8)((A_u16Color & 0xFF00) >> 8);
+	u8 LSB = (u8)(A_u16Color & 0x00FF);
+	u32 L_u32PixelCount;
+	u32 L_u32Index;
+
+	if((A_u16Width == 0U) || (A_u16Height == 0U) || (A_u16X >= 128U) || (A_u16Y >= 160U))
+	{
+		return;
+	}
+
+	L_u32PixelCount = (u32)A_u16Width * (u32)A_u16Height;
+	HTFT_vSetXPos(A_u16X, (u16)(A_u16X + A_u16Width - 1U));
+	HTFT_vSetYPos(A_u16Y, (u16)(A_u16Y + A_u16Height - 1U));
+	write_cmd(0x2C); // Memory Write
+
+	for(L_u32Index = 0U; L_u32Index < L_u32PixelCount; L_u32Index++)
+	{
+		write_data(MSB);
+		write_data(LSB);
+	}
+}
+
+void HTFT_vDrawRectOutline(u16 A_u16X, u16 A_u16Y, u16 A_u16Width, u16 A_u16Height, u16 A_u16Color)
+{
+	if((A_u16Width == 0U) || (A_u16Height == 0U))
+	{
+		return;
+	}
+
+	HTFT_vDrawFilledRect(A_u16X, A_u16Y, A_u16Width, 1U, A_u16Color);
+	HTFT_vDrawFilledRect(A_u16X, (u16)(A_u16Y + A_u16Height - 1U), A_u16Width, 1U, A_u16Color);
+	HTFT_vDrawFilledRect(A_u16X, A_u16Y, 1U, A_u16Height, A_u16Color);
+	HTFT_vDrawFilledRect((u16)(A_u16X + A_u16Width - 1U), A_u16Y, 1U, A_u16Height, A_u16Color);
+}
+
+void HTFT_vDrawBitmap(u16 A_u16X, u16 A_u16Y, u8 A_u8Width, u8 A_u8Height, const u8* A_pu8Bitmap, u16 A_u16Color, u8 A_u8Scale)
+{
+	u8 L_u8Row;
+	u8 L_u8Col;
+	u8 L_u8ScaleVal = (A_u8Scale == 0U) ? 1U : A_u8Scale;
+
+	for(L_u8Row = 0U; L_u8Row < A_u8Height; L_u8Row++)
+	{
+		for(L_u8Col = 0U; L_u8Col < A_u8Width; L_u8Col++)
+		{
+			if((A_pu8Bitmap[L_u8Row] & (1U << (A_u8Width - 1U - L_u8Col))) != 0U)
+			{
+				HTFT_vDrawFilledRect((u16)(A_u16X + (L_u8Col * L_u8ScaleVal)),
+									 (u16)(A_u16Y + (L_u8Row * L_u8ScaleVal)),
+									 L_u8ScaleVal, L_u8ScaleVal, A_u16Color);
+			}
+		}
+	}
+}
 static const u8 TFT_Font5x7[][5] =
 {
 	{0x00,0x00,0x00,0x00,0x00}, /* space */
