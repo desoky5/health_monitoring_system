@@ -375,7 +375,7 @@ static void Display_LEDMATRIX(void* A_pvParameters)
 			.ShiftCLKPort=GPIO_PORTA,
 			.ShiftCLKPin=GPIO_PIN12,
 			.LatchCLKPort=GPIO_PORTA,
-			.LatchCLKPin=GPIO_PIN9
+			.LatchCLKPin=GPIO_PIN8
 	};
 	HS2P_vInit(&ACT_STAT);
 	(void)A_pvParameters;
@@ -590,6 +590,7 @@ int main(void)
 	(void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
 	(void)xTaskCreate(ResetTask, "Reset", 128U, NULL, 2U, NULL);
 	(void)xTaskCreate(PowerTask, "Power", 128U, NULL, 2U, NULL);
+	//(void)xTaskCreate(Display_LEDMATRIX, "LED Matrix", 256U, NULL, 1U, NULL);
 	(void)xTaskCreate(BuzzerTask, "Buzzer", 128U, NULL, 2U, NULL);
 	vTaskStartScheduler();
 
