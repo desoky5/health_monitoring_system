@@ -12,7 +12,7 @@
 
 void HIMU_vInit(void);
 
-s32 HIMU_s16ReadXData(void);
+s16 HIMU_s16ReadXData(void);
 
 s16 HIMU_s16ReadYData(void);
 

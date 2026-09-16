@@ -9,7 +9,7 @@
 #define HAL_LEDMATRIX_LEDMATRIX_CFG_H_
 
 
-#define SCAN_TIME			2
+#define SCAN_TIME			2.5
 
 
 #endif /* HAL_LEDMATRIX_LEDMATRIX_CFG_H_ */
