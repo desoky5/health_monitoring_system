@@ -17,7 +17,7 @@
 #include "../FreeRTOS/semphr.h"
 
 #define HEART_RATE_TASK_PERIOD_MS  10U
-#define MOTION_TASK_PERIOD_MS      100U
+#define MOTION_TASK_PERIOD_MS      165U
 #define DISPLAY_TASK_PERIOD_MS     100U
 #define UART_TASK_PERIOD_MS        1000U
 #define NAVIGATION_TASK_PERIOD_MS  20U
@@ -34,6 +34,8 @@
 #define PROGRESS_BAR_X              8U
 #define PROGRESS_BAR_WIDTH          112U
 #define PROGRESS_BAR_HEIGHT         14U
+#define RESET_TASK_PERIOD_MS       20U
+#define POWER_TASK_PERIOD_MS       20U
 
 /* 7x7 heart glyph, one byte per row (MSB = leftmost pixel). */
 static const u8 G_au8HeartIcon[7] = { 0x36U, 0x7FU, 0x7FU, 0x3EU, 0x1CU, 0x08U, 0x00U };
@@ -50,6 +52,8 @@ u8 Stoped[8]={0x00, 0x08, 0x1C, 0x1C, 0x08, 0x3E, 0x08, 0x36};
 
 u8 Walking[8]={0x00, 0x00, 0x18, 0x18, 0x08, 0x08, 0x14, 0x2C};
 
+static u8 G_u8PowerState = 1U; /* 1 = display ON, 0 = display OFF */
+static SemaphoreHandle_t G_xPowerMutex;
 
 static Measurements_t G_xMeasurements;
 static SemaphoreHandle_t G_xMeasurementsMutex;
@@ -65,7 +69,9 @@ static void NavigationTask(void* A_pvParameters);
 static u16 HeartRate_u16GetStatusColor(u16 A_u16Bpm);
 static u16 Display_u16ProgressWidth(u32 A_u32Value, u32 A_u32Max, u16 A_u16BarWidth);
 static void Display_LEDMATRIX(void* A_pvParameters);
-
+static void ResetTask(void* A_pvParameters);
+static void PowerTask(void* A_pvParameters);
+static u8 Power_u8GetState(void);
 
 static void Peripherals_vInit(void)
 {
@@ -77,6 +83,8 @@ static void Peripherals_vInit(void)
 	GPIOx_PinConfig_t L_xUartTx = { .Port = GPIO_PORTA, .Pin = GPIO_PIN9, .Mode = GPIO_ALF, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_high_speed, .PullType = GPIO_OT_NOPULL, .AltFunc = GPIO_AF7 };
 	GPIOx_PinConfig_t L_xUartRx = { .Port = GPIO_PORTA, .Pin = GPIO_PIN10, .Mode = GPIO_ALF, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_high_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF7 };
 	GPIOx_PinConfig_t L_xNavigationButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN2, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
+	GPIOx_PinConfig_t L_xResetButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN1, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
+	GPIOx_PinConfig_t L_xPowerButton = { .Port = GPIO_PORTB, .Pin = GPIO_PIN0, .Mode = GPIO_Input, .OutputType = OUTPUT_push_pull, .OutputSpeed = Output_low_speed, .PullType = GPIO_OT_PULLUP, .AltFunc = GPIO_AF0 };
 
 	MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOA);
 	MRCC_vEnableCLK(RCC_AHB1, RCC_GPIOB);
@@ -91,6 +99,8 @@ static void Peripherals_vInit(void)
 	MGPIO_vInit(&L_xUartTx);
 	MGPIO_vInit(&L_xUartRx);
 	MGPIO_vInit(&L_xNavigationButton);
+	MGPIO_vInit(&L_xResetButton);
+	MGPIO_vInit(&L_xPowerButton);
 	MSPI_vInit();
 	HIMU_vInit();
 	HTFT_vInit();
@@ -226,10 +236,27 @@ static void DisplayTask(void* A_pvParameters)
     u16 L_u16StatusColor;
     u16 L_u16BarFillWidth;
     u8 L_u8PrevPage = 0xFFU;
+    u8 L_u8PrevPowerState = 1U;
+    u8 L_u8PowerState;
     (void)A_pvParameters;
 
     for (;;)
     {
+        L_u8PowerState = Power_u8GetState();
+
+        if (L_u8PowerState == 0U)
+        {
+            if (L_u8PrevPowerState == 1U)
+            {
+                HTFT_vFillBackgroundColor(TFT_COLOR_BLACK);
+            }
+            L_u8PrevPowerState = 0U;
+            L_u8PrevPage = 0xFFU;
+            vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(DISPLAY_TASK_PERIOD_MS));
+            continue;
+        }
+        L_u8PrevPowerState = 1U;
+
         Measurements_vGetSnapshot(&L_xSnapshot);
 
         /* Only repaint the full page (border/labels/outlines) when the page actually changes. */
@@ -290,12 +317,17 @@ static void DisplayTask(void* A_pvParameters)
 
             if (L_xSnapshot.AccelerationMg >= MOTION_THRESHOLD_MG)
             {
+            	HTFT_vWriteText(32U, 137U, "STILL", TFT_COLOR_BLACK);
+            	 HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_BLACK);
+
                 HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_ORANGE);
                 HTFT_vWriteText(32U, 137U, "MOVING", TFT_COLOR_ORANGE);
             }
             else
             {
                  HTFT_vWriteText(32U, 137U, "MOVING", TFT_COLOR_BLACK);
+                 HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_BLACK);
+
                 HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_GREEN);
                 HTFT_vWriteText(32U, 137U, "STILL", TFT_COLOR_GREEN);
             }
@@ -413,7 +445,81 @@ static void UartTask(void* A_pvParameters)
 		vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(UART_TASK_PERIOD_MS));
 	}
 }
+static void ResetTask(void* A_pvParameters)
+{
+	TickType_t L_xLastWakeTime = xTaskGetTickCount();
+	u8 L_u8ButtonWasPressed = 0U;
+	(void)A_pvParameters;
 
+	for (;;)
+	{
+		if (MGPIO_u8GetPinVal(GPIO_PORTB, GPIO_PIN1) == GPIO_LOW)
+		{
+			if (L_u8ButtonWasPressed == 0U)
+			{
+				L_u8ButtonWasPressed = 1U;
+
+				HTFT_vDrawFilledRect(0U, 148U, 128U, 12U, TFT_COLOR_BLACK);
+				HTFT_vWriteText(2U, 148U, "RST PRESSED", TFT_COLOR_RED);   /* debug */
+
+				if (xSemaphoreTake(G_xMeasurementsMutex, portMAX_DELAY) == pdTRUE)
+				{
+					G_xMeasurements.HeartRateBpm = 0U;
+					G_xMeasurements.StepCount = 0U;
+					G_xMeasurements.AccelerationMg = 0U;
+					(void)xSemaphoreGive(G_xMeasurementsMutex);
+				}
+
+				HTFT_vDrawFilledRect(0U, 148U, 128U, 12U, TFT_COLOR_BLACK);
+				HTFT_vWriteText(2U, 148U, "RST DONE", TFT_COLOR_GREEN);   /* debug */
+			}
+		}
+		else
+		{
+			L_u8ButtonWasPressed = 0U;
+		}
+		vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(RESET_TASK_PERIOD_MS));
+	}
+}
+
+static u8 Power_u8GetState(void)
+{
+	u8 L_u8State = 1U;
+	if (xSemaphoreTake(G_xPowerMutex, portMAX_DELAY) == pdTRUE)
+	{
+		L_u8State = G_u8PowerState;
+		(void)xSemaphoreGive(G_xPowerMutex);
+	}
+	return L_u8State;
+}
+
+static void PowerTask(void* A_pvParameters)
+{
+	TickType_t L_xLastWakeTime = xTaskGetTickCount();
+	u8 L_u8ButtonWasPressed = 0U;
+	(void)A_pvParameters;
+
+	for (;;)
+	{
+		if (MGPIO_u8GetPinVal(GPIO_PORTB, GPIO_PIN0) == GPIO_LOW)
+		{
+			if (L_u8ButtonWasPressed == 0U)
+			{
+				L_u8ButtonWasPressed = 1U;
+				if (xSemaphoreTake(G_xPowerMutex, portMAX_DELAY) == pdTRUE)
+				{
+					G_u8PowerState = (G_u8PowerState == 1U) ? 0U : 1U;
+					(void)xSemaphoreGive(G_xPowerMutex);
+				}
+			}
+		}
+		else
+		{
+			L_u8ButtonWasPressed = 0U;
+		}
+		vTaskDelayUntil(&L_xLastWakeTime, pdMS_TO_TICKS(POWER_TASK_PERIOD_MS));
+	}
+}
 int main(void)
 {
 	SCB_CPACR |= (0xFU << 20U);
@@ -428,18 +534,21 @@ int main(void)
 		}
 	}
 
-    (void)xTaskCreate(HeartRateTask, "HeartRate", 256U, NULL, 3U, NULL);
-    (void)xTaskCreate(MotionTask, "Motion", 256U, NULL, 2U, NULL);
-    (void)xTaskCreate(DisplayTask, "Display", 384U, NULL, 1U, NULL);
-    (void)xTaskCreate(UartTask, "UART", 256U, NULL, 1U, NULL);
-    (void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
-    vTaskStartScheduler();
+	G_xPowerMutex = xSemaphoreCreateMutex();
+	if (G_xPowerMutex == NULL)
+	{
+		for (;;)
+		{
+		}
+	}
+
 	(void)xTaskCreate(HeartRateTask, "HeartRate", 256U, NULL, 3U, NULL);
 	(void)xTaskCreate(MotionTask, "Motion", 256U, NULL, 2U, NULL);
-	(void)xTaskCreate(DisplayTask, "Display", 256U, NULL, 1U, NULL);
+	(void)xTaskCreate(DisplayTask, "Display", 384U, NULL, 1U, NULL);
 	(void)xTaskCreate(UartTask, "UART", 256U, NULL, 1U, NULL);
 	(void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
-	(void)xTaskCreate(Display_LEDMATRIX, "LEDMATRIX", 256U, NULL, 4U, NULL);
+	(void)xTaskCreate(ResetTask, "Reset", 128U, NULL, 2U, NULL);
+	(void)xTaskCreate(PowerTask, "Power", 128U, NULL, 2U, NULL);
 
 	vTaskStartScheduler();
 
