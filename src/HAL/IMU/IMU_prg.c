@@ -141,7 +141,6 @@ u32 IMU_u32MagnitudeMg(s16 A_s16X, s16 A_s16Y, s16 A_s16Z)
 
 	/* DATA_FORMAT is full-resolution +/-2 g: 1 count is approximately 4 mg. */
 	L_u32Magnitude*= 4U;
-	L_u32Magnitude/=1000;
 	L_u32Magnitude--;
 	return L_u32Magnitude ;
 }
