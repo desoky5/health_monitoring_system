@@ -295,6 +295,7 @@ static void DisplayTask(void* A_pvParameters)
             }
             else
             {
+                 HTFT_vWriteText(32U, 137U, "MOVING", TFT_COLOR_BLACK);
                 HTFT_vDrawFilledRect(6U, 130U, 20U, 20U, TFT_COLOR_GREEN);
                 HTFT_vWriteText(32U, 137U, "STILL", TFT_COLOR_GREEN);
             }
