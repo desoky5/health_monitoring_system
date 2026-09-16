@@ -344,7 +344,7 @@ int main(void)
 
     (void)xTaskCreate(HeartRateTask, "HeartRate", 256U, NULL, 3U, NULL);
     (void)xTaskCreate(MotionTask, "Motion", 256U, NULL, 2U, NULL);
-    (void)xTaskCreate(DisplayTask, "Display", 256U, NULL, 1U, NULL);
+    (void)xTaskCreate(DisplayTask, "Display", 384U, NULL, 1U, NULL);
     (void)xTaskCreate(UartTask, "UART", 256U, NULL, 1U, NULL);
     (void)xTaskCreate(NavigationTask, "Navigation", 128U, NULL, 2U, NULL);
     vTaskStartScheduler();
