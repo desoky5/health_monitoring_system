@@ -14,6 +14,7 @@ typedef struct
     s32 FilteredAc;
     u8 ExtremaInitialized;
     u8 AboveThreshold;
+    u8 TimingSynced;
     u32 MsSinceLastBeat;
     u32 BeatIntervals[HHEART_RATE_HISTORY_LEN];
     u8 IntervalIndex;
@@ -84,6 +85,7 @@ void HHeartRate_vProcessSample(u16 A_u16AdcSample)
         G_xHeartRate.IntervalsFilled = 0U;
         G_xHeartRate.IntervalIndex = 0U;
         G_xHeartRate.SignalStableSamples = 0U;
+        G_xHeartRate.TimingSynced = 0U;
         return;
     }
 
@@ -100,6 +102,15 @@ void HHeartRate_vProcessSample(u16 A_u16AdcSample)
         u32 L_u32CandidateInterval = G_xHeartRate.MsSinceLastBeat;
 
         G_xHeartRate.AboveThreshold = 1U;
+
+        /* First crossing after (re)sync only marks T0; the elapsed startup/settling time is not a real beat interval. */
+        if (G_xHeartRate.TimingSynced == 0U)
+        {
+            G_xHeartRate.TimingSynced = 1U;
+            G_xHeartRate.MsSinceLastBeat = 0U;
+            return;
+        }
+
         if ((L_u32CandidateInterval <
              (60000UL / HHEART_RATE_MAX_VALID_BPM)) ||
             (L_u32CandidateInterval >
